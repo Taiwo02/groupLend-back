@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('src/openapi.json', 'dist/openapi.json')\"",
     "typecheck": "tsc --noEmit",
     "migrate": "bun run src/migrate.ts",
     "migrate:undo": "bun run src/migrate-undo.ts"
