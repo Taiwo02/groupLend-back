@@ -6,7 +6,7 @@ import {
   signupSchema,
   submitIncomeSchema
 } from "../validators/auth.validator";
-import { parseWithSchema, readJsonBody } from "../utils/request";
+import { parseWithSchema, readJsonBody, z } from "../utils/request";
 import { sanitizeUser } from "../utils/serializers";
 
 export class AuthController {
@@ -14,7 +14,7 @@ export class AuthController {
 
   async signup(c: Context): Promise<Response> {
     const body = await readJsonBody<Record<string, unknown>>(c);
-    const payload = parseWithSchema(signupSchema, body);
+    const payload = parseWithSchema(signupSchema, body) as z.infer<typeof signupSchema>;
     const result = await this.authService.signup({
       fullName: payload.fullName,
       email: payload.email,
@@ -33,7 +33,7 @@ export class AuthController {
 
   async login(c: Context): Promise<Response> {
     const body = await readJsonBody<Record<string, unknown>>(c);
-    const payload = parseWithSchema(loginSchema, body);
+    const payload = parseWithSchema(loginSchema, body) as z.infer<typeof loginSchema>;
     const result = await this.authService.login({
       email: payload.email,
       password: payload.password
@@ -47,7 +47,7 @@ export class AuthController {
 
   async submitIncome(c: Context): Promise<Response> {
     const body = await readJsonBody<Record<string, unknown>>(c);
-    const payload = parseWithSchema(submitIncomeSchema, body);
+    const payload = parseWithSchema(submitIncomeSchema, body) as z.infer<typeof submitIncomeSchema>;
     const user = await this.authService.submitIncome(c.get("userId"), {
       monthlyIncome: payload.monthlyIncome,
       employmentStatus: payload.employmentStatus
@@ -57,7 +57,7 @@ export class AuthController {
 
   async setLoanPin(c: Context): Promise<Response> {
     const body = await readJsonBody<Record<string, unknown>>(c);
-    const payload = parseWithSchema(setLoanPinSchema, body);
+    const payload = parseWithSchema(setLoanPinSchema, body) as z.infer<typeof setLoanPinSchema>;
     await this.authService.setLoanPin(c.get("userId"), payload.pin);
     return c.json({ message: "Loan PIN set successfully" });
   }
