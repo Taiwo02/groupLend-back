@@ -1,6 +1,6 @@
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
-import { serve } from "bun";
+import { serve } from "@hono/node-server";
 import { env } from "./config/env";
 import { sequelize } from "./config/database";
 import { initModelAssociations } from "./models";
@@ -12,8 +12,8 @@ const bootstrap = async (): Promise<void> => {
 
   const app = createApp();
   serve({
-    port: env.port,
-    fetch: app.fetch
+    fetch: app.fetch,
+    port: env.port
   });
 
   console.log(`Enlace Lending API running on port ${env.port}`);

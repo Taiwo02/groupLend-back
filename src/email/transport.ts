@@ -1,5 +1,3 @@
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
 import { SendMailClient } from "zeptomail";
 import { env } from "../config/env";
 
@@ -16,7 +14,7 @@ export type MailTransport = {
 
 let transport: MailTransport | null | undefined = undefined;
 
-function createZeptomailTransport(): MailTransport | null {
+function createTransport(): MailTransport | null {
   if (!env.zohoUrl || !env.zohoToken) return null;
   const client = new SendMailClient({ url: env.zohoUrl, token: env.zohoToken });
   return {
@@ -36,34 +34,6 @@ function createZeptomailTransport(): MailTransport | null {
         ],
         subject: options.subject,
         htmlbody: options.html
-      });
-    }
-  };
-}
-
-function createNodemailerTransport(): Transporter | null {
-  if (!env.smtpHost || !env.smtpUser || !env.smtpPass) return null;
-  return nodemailer.createTransport({
-    host: env.smtpHost,
-    port: env.smtpPort,
-    secure: env.smtpSecure,
-    auth: { user: env.smtpUser, pass: env.smtpPass }
-  });
-}
-
-function createTransport(): MailTransport | null {
-  const zepto = createZeptomailTransport();
-  if (zepto) return zepto;
-  const nodemailerTransport = createNodemailerTransport();
-  if (!nodemailerTransport) return null;
-  return {
-    async sendMail(options) {
-      await nodemailerTransport.sendMail({
-        from: options.from,
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text ?? options.html.replace(/<[^>]+>/g, "").trim()
       });
     }
   };

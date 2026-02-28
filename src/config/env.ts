@@ -17,16 +17,11 @@ export const env = {
   dbLogging: parseBoolean(process.env.DB_LOGGING, false),
   ninApiUrl: process.env.NIN_API_URL ?? "",
   ninApiKey: process.env.NIN_API_KEY ?? "",
-  // Email – Zeptomail (Zoho) when URL/token set; otherwise SMTP
+  // Email – Zeptomail (Zoho) only; set ZOHO_URL and ZOHO_TOKEN to enable
   zohoUrl: process.env.ZOHO_URL ?? "",
   zohoToken: process.env.ZOHO_TOKEN ?? "",
   mailFrom: process.env.MAIL_FROM ?? "info@enlace.ng",
   mailFromName: process.env.MAIL_FROM_NAME ?? "noreply",
-  smtpHost: process.env.SMTP_HOST ?? "",
-  smtpPort: Number(process.env.SMTP_PORT ?? 587),
-  smtpSecure: parseBoolean(process.env.SMTP_SECURE, false),
-  smtpUser: process.env.SMTP_USER ?? "",
-  smtpPass: process.env.SMTP_PASS ?? "",
   appName: process.env.APP_NAME ?? "Enlace Group Loan"
 };
 
