@@ -1,0 +1,660 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Enlace Group Loan API",
+    "description": "API for group lending: onboarding, loans, repayments, trust and credibility.",
+    "version": "1.0.0",
+    "license": { "name": "ISC" }
+  },
+  "servers": [{ "url": "/", "description": "API root" }],
+  "tags": [
+    { "name": "Health", "description": "Health check" },
+    { "name": "Auth", "description": "Signup, login, income, PIN" },
+    { "name": "KYC", "description": "Customer KYC step-by-step flow and go-back" },
+    { "name": "Dashboard", "description": "Aggregated user dashboard" },
+    { "name": "Groups", "description": "Groups and members" },
+    { "name": "Loans", "description": "Individual and group loans" },
+    { "name": "Repayments", "description": "Record repayments" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "responses": { "200": { "description": "Service ok", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } } }
+      }
+     }
+    },
+    "/auth/signup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Sign up",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["fullName", "email", "password", "monthlyIncome", "employmentStatus"],
+                "properties": {
+                  "fullName": { "type": "string", "minLength": 2 },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 },
+                  "phone": { "type": "string" },
+                  "location": { "type": "string" },
+                  "monthlyIncome": { "type": "number", "minimum": 0 },
+                  "employmentStatus": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" },
+                    "onboardingState": { "type": "string", "enum": ["INCOME_PENDING", "ONBOARDING_COMPLETE"] }
+                  }
+                }
+              }
+            }
+          },
+          "409": { "description": "Email already exists" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log in",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" },
+                    "onboardingState": { "type": "string", "enum": ["INCOME_PENDING", "ONBOARDING_COMPLETE"] }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/auth/income": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Submit income (and employment). Recomputes credit limit and group pools.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["monthlyIncome"],
+                "properties": {
+                  "monthlyIncome": { "type": "number", "exclusiveMinimum": 0 },
+                  "employmentStatus": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "user": { "$ref": "#/components/schemas/User" } } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+    },
+    "/auth/pin": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Set loan PIN once (4 digits). Cannot be set again after it is set.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pin"],
+                "properties": { "pin": { "type": "string", "pattern": "^\\d{4}$", "description": "4 digits" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "PIN set" },
+          "401": { "description": "Unauthorized" },
+          "409": { "description": "Loan PIN has already been set and cannot be changed" }
+        }
+      }
+    },
+    "/auth/kyc/status": {
+      "get": {
+        "tags": ["KYC"],
+        "summary": "Get KYC status and current step",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kycStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+                    "kycStep": { "type": "integer", "minimum": 0, "maximum": 5 },
+                    "submittedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ninData": { "type": "object", "nullable": true },
+                        "address": { "type": "object", "nullable": true },
+                        "employmentDetails": { "type": "object", "nullable": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/auth/kyc/step": {
+      "put": {
+        "tags": ["KYC"],
+        "summary": "Submit current KYC step (advances to next step)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": ["step", "nin"],
+                    "properties": {
+                      "step": { "type": "integer", "enum": [0], "description": "NIN lookup; OTP sent to phone on NIN" },
+                      "nin": { "type": "string", "minLength": 11 }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["step", "otp"],
+                    "properties": {
+                      "step": { "type": "integer", "enum": [1], "description": "Verify OTP; name must match account" },
+                      "otp": { "type": "string", "pattern": "^\\d{6}$", "description": "6-digit OTP" }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["step", "address"],
+                    "properties": {
+                      "step": { "type": "integer", "enum": [2], "description": "Confirm address from NIN" },
+                      "address": {
+                        "type": "object",
+                        "required": ["addressLine1", "town", "lga", "state"],
+                        "properties": {
+                          "addressLine1": { "type": "string" },
+                          "town": { "type": "string" },
+                          "lga": { "type": "string" },
+                          "state": { "type": "string" }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["step", "code"],
+                    "properties": {
+                      "step": { "type": "integer", "enum": [3], "description": "Disbursement account; saveStatementInfo" },
+                      "code": { "type": "string", "description": "Link code or \"skip\"" },
+                      "accountId": { "type": "string", "description": "Optional account id" }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["step", "employmentDetails"],
+                    "properties": {
+                      "step": { "type": "integer", "enum": [4], "description": "Employment details" },
+                      "employmentDetails": {
+                        "type": "object",
+                        "required": ["employerName", "jobTitle", "employmentStatus", "monthlyIncome"],
+                        "properties": {
+                          "employerName": { "type": "string" },
+                          "jobTitle": { "type": "string" },
+                          "employmentStatus": { "type": "string" },
+                          "monthlyIncome": { "type": "number", "exclusiveMinimum": 0 }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved or submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "kycStep": { "type": "integer" },
+                    "address": {
+                      "type": "object",
+                      "description": "Present after step 1 (OTP verified); use to show confirm-address step",
+                      "properties": {
+                        "addressLine1": { "type": "string" },
+                        "town": { "type": "string" },
+                        "lga": { "type": "string" },
+                        "state": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Wrong step or validation error" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/auth/kyc/step/back": {
+      "post": {
+        "tags": ["KYC"],
+        "summary": "Go back to a previous KYC step",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["toStep"],
+                "properties": { "toStep": { "type": "integer", "minimum": 0, "maximum": 4, "description": "Step index to return to (0–4)" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moved back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "kycStep": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Cannot go back (e.g. already submitted or toStep invalid)" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get dashboard (requires onboarding complete)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activeLoans": { "type": "integer" },
+                    "pendingApprovals": { "type": "integer" },
+                    "creditEligibility": { "type": "number" },
+                    "groupPoolStatus": { "type": "array", "items": { "type": "object", "properties": { "groupId": { "type": "string", "format": "uuid" }, "groupName": { "type": "string" }, "currentPool": { "type": "number" } } } },
+                    "credibilityScore": { "type": "number", "nullable": true },
+                    "trustBadge": { "type": "string", "enum": ["BRONZE", "SILVER", "GOLD"] }
+                  }
+                }
+              }
+            }
+          },
+          "403": { "description": "Onboarding not complete" }
+        }
+      }
+    },
+    "/groups": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Create group",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "description", "states", "expectedLoan"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 2 },
+                  "description": { "type": "string", "minLength": 1 },
+                  "states": { "type": "array", "items": { "type": "string" }, "minItems": 1, "example": ["Lagos", "Oyo"] },
+                  "expectedLoan": { "type": "number", "minimum": 0 },
+                  "targetCredit": { "type": "number", "minimum": 0 },
+                  "minimumAmount": { "type": "number", "minimum": 0 },
+                  "maximumAmount": { "type": "number", "minimum": 0 },
+                  "repaymentPeriod": { "type": "integer", "minimum": 1 },
+                  "repaymentType": { "type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"] },
+                  "interestType": { "type": "string", "enum": ["flat", "reducingBalance"] },
+                  "interest": { "type": "number", "minimum": 0 },
+                  "penalCharges": { "type": "number", "minimum": 0 },
+                  "gracePeriod": { "type": "integer", "minimum": 0 },
+                  "gracePeriodType": { "type": "string", "maxLength": 20 },
+                  "overGracePenalCharges": { "type": "number", "minimum": 0 },
+                  "ageRange": { "type": "array", "items": { "type": "string" }, "example": ["18-35", "30-45"] },
+                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "PENDING"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "401": { "description": "Unauthorized" } }
+      }
+    },
+    "/groups/{id}": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Get group by ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "403": { "description": "Not a member" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/groups/{id}/invite": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Invite members (creator only)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userIds"],
+                "properties": { "userIds": { "type": "array", "items": { "type": "string", "format": "uuid" }, "minItems": 1 } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/GroupMember" } } } } }, "403": { "description": "Only creator can invite" }, "404": { "description": "Group or users not found" } }
+      }
+    },
+    "/groups/{id}/exit": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Request exit (sets status to ISOLATED)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GroupMember" } } } }, "400": { "description": "Already exited or exit already requested" }, "404": { "description": "Not a member" } }
+      }
+    },
+    "/groups/{id}/exit/final": {
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Permanent exit (only when all group loans repaid)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GroupMember" } } } }, "400": { "description": "Cannot exit until group loans repaid" }, "404": { "description": "Not a member" } }
+      }
+    },
+    "/loans/individual": {
+      "post": {
+        "tags": ["Loans"],
+        "summary": "Request individual loan (requires onboarding + loan PIN)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "interestRate", "tenorMonths", "loanPin"],
+                "properties": {
+                  "amount": { "type": "number", "exclusiveMinimum": 0 },
+                  "interestRate": { "type": "number", "minimum": 0 },
+                  "tenorMonths": { "type": "integer", "minimum": 1 },
+                  "loanPin": { "type": "string", "pattern": "^\\d{6}$" },
+                  "loanPurpose": { "type": "string", "enum": ["PERSONAL", "BUSINESS", "EDUCATION", "EMERGENCY", "OTHER"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } }, "400": { "description": "Amount exceeds credit limit" }, "403": { "description": "Onboarding not complete or invalid PIN" } }
+      }
+    },
+    "/loans/group": {
+      "post": {
+        "tags": ["Loans"],
+        "summary": "Request group loan (requires onboarding + loan PIN)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["groupId", "amount", "interestRate", "tenorMonths", "loanPin"],
+                "properties": {
+                  "groupId": { "type": "string", "format": "uuid" },
+                  "amount": { "type": "number", "exclusiveMinimum": 0 },
+                  "interestRate": { "type": "number", "minimum": 0 },
+                  "tenorMonths": { "type": "integer", "minimum": 1 },
+                  "loanPin": { "type": "string", "pattern": "^\\d{6}$" },
+                  "loanPurpose": { "type": "string", "enum": ["PERSONAL", "BUSINESS", "EDUCATION", "EMERGENCY", "OTHER"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } }, "400": { "description": "Amount exceeds pool or no active members" }, "403": { "description": "Not active member or onboarding/PIN" }, "404": { "description": "Group not found" } }
+      }
+    },
+    "/loans/{id}": {
+      "get": {
+        "tags": ["Loans"],
+        "summary": "Get loan by ID (borrower or approver)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } }, "403": { "description": "No access" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/loans/{id}/approve": {
+      "post": {
+        "tags": ["Loans"],
+        "summary": "Approve a group loan (requires onboarding + loan PIN)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["loanPin"],
+                "properties": { "loanPin": { "type": "string", "pattern": "^\\d{6}$" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } }, "400": { "description": "Not pending or already rejected / mandate not ACTIVE" }, "403": { "description": "Not eligible or invalid PIN" }, "404": { "description": "Loan not found" } }
+      }
+    },
+    "/loans/{id}/institutional-approval": {
+      "post": {
+        "tags": ["Loans"],
+        "summary": "Partner callback: continue group approval after institutional approval",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } }, "400": { "description": "Loan not INSTITUTIONAL_PENDING" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/repayments": {
+      "post": {
+        "tags": ["Repayments"],
+        "summary": "Record repayment (borrower only)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["loanId", "amount"],
+                "properties": {
+                  "loanId": { "type": "string", "format": "uuid" },
+                  "amount": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loan" } } } }, "400": { "description": "Invalid amount or loan not repayable" }, "403": { "description": "Only borrower can record" }, "404": { "description": "Loan not found" } }
+      }
+    }
+  ,
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT from login or signup"
+      }
+    },
+    "schemas": {
+      "Health": { "type": "object", "properties": { "ok": { "type": "boolean" }, "service": { "type": "string" } } },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "fullName": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string", "nullable": true },
+          "location": { "type": "string", "nullable": true },
+          "employmentStatus": { "type": "string", "nullable": true },
+          "monthlyIncome": { "type": "number", "nullable": true },
+          "creditLimit": { "type": "number" },
+          "kycStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+          "creditStatus": { "type": "string", "enum": ["LOCKED", "ACTIVE"] },
+          "trustScore": { "type": "number" },
+          "trustLevel": { "type": "string", "enum": ["BRONZE", "SILVER", "GOLD"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "nullable": true },
+          "name": { "type": "string" },
+          "targetCredit": { "type": "number" },
+          "currentCreditPool": { "type": "number" },
+          "credibilityScore": { "type": "number" },
+          "credibilityLevel": { "type": "string", "enum": ["STANDARD", "VERIFIED_TRUST_GROUP"] },
+          "quarterlyStartDate": { "type": "string", "format": "date", "nullable": true },
+          "quarterlyEndDate": { "type": "string", "format": "date", "nullable": true },
+          "createdBy": { "type": "string", "format": "uuid" },
+          "minimumAmount": { "type": "number", "nullable": true },
+          "maximumAmount": { "type": "number", "nullable": true },
+          "repaymentPeriod": { "type": "integer", "nullable": true },
+          "repaymentType": { "type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"], "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "interestType": { "type": "string", "enum": ["flat", "reducingBalance"], "nullable": true },
+          "interest": { "type": "number", "nullable": true },
+          "penalCharges": { "type": "number", "nullable": true },
+          "gracePeriod": { "type": "integer", "nullable": true },
+          "gracePeriodType": { "type": "string", "nullable": true },
+          "overGracePenalCharges": { "type": "number", "nullable": true },
+          "ageRange": { "type": "array", "items": { "type": "string" } },
+          "states": { "type": "array", "items": { "type": "string" } },
+          "expectedLoan": { "type": "number", "nullable": true },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "PENDING"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "GroupMember": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid" },
+          "role": { "type": "string", "enum": ["CREATOR", "MEMBER"] },
+          "status": { "type": "string", "enum": ["INVITED", "ACTIVE", "ISOLATED", "EXITED"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Loan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "borrowerId": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid", "nullable": true },
+          "amount": { "type": "number" },
+          "interestRate": { "type": "number" },
+          "tenorMonths": { "type": "integer" },
+          "loanPurpose": { "type": "string", "enum": ["PERSONAL", "BUSINESS", "EDUCATION", "EMERGENCY", "OTHER"], "nullable": true },
+          "status": { "type": "string", "enum": ["REQUESTED", "PENDING_APPROVAL", "INSTITUTIONAL_PENDING", "APPROVED", "DISBURSED", "ACTIVE", "REPAID", "DEFAULTED"] },
+          "outstandingBalance": { "type": "number" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
+}
