@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { LoanController } from "../controllers/loan.controller";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { LoanController } from "../controllers/loan.controller.js";
 
 type OnboardingMiddleware = (c: import("hono").Context, next: () => Promise<void>) => Promise<void>;
 

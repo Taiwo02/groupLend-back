@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import type { NinLookupData } from "../types/nin";
+import { sequelize } from "../config/database.js";
+import type { NinLookupData } from "../types/nin.js";
 
 export class UserKycOtp extends Model<
   InferAttributes<UserKycOtp>,

@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { DirectDebitMandate } from "../models";
-import { MandateStatus } from "../models/enums";
+import { DirectDebitMandate } from "../models/index.js";
+import { MandateStatus } from "../models/enums.js";
 
 export class DirectDebitMandateDao {
   findByUserAndGroup(

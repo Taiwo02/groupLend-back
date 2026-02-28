@@ -1,4 +1,4 @@
-import { getMailTransport } from "./transport";
+import { getMailTransport } from "./transport.js";
 import {
   welcomeTemplate,
   groupInviteTemplate,
@@ -14,8 +14,8 @@ import {
   type LoanRejectionTemplateVars,
   type RepaymentReminderTemplateVars,
   type DefaultAlertTemplateVars
-} from "./templates";
-import { env } from "../config/env";
+} from "./templates.js";
+import { env } from "../config/env.js";
 
 export class EmailService {
   async sendMail(options: {

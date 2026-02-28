@@ -1,10 +1,10 @@
 import { Transaction } from "sequelize";
-import { UserKycData } from "../models";
+import { UserKycData } from "../models/index.js";
 import type {
   BioDataPayload,
   ContactPayload,
   EmploymentDetailsPayload
-} from "../models/user-kyc-data.model";
+} from "../models/user-kyc-data.model.js";
 
 export class UserKycDataDao {
   findByUserId(userId: string, transaction?: Transaction): Promise<UserKycData | null> {

@@ -1,4 +1,4 @@
-import type { MigrationContext } from "./types";
+import type { MigrationContext } from "./types.js";
 
 /** Run ADD CONSTRAINT only if the constraint does not exist (idempotent for existing DBs). */
 async function addFkIfNotExists(

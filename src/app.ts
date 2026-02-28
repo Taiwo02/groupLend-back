@@ -1,14 +1,14 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { getContainer } from "./container";
-import { createAuthRoutes } from "./routes/auth.routes";
-import { createKycRoutes } from "./routes/kyc.routes";
-import { createDashboardRoutes } from "./routes/dashboard.routes";
-import { createDocRoutes } from "./routes/doc.routes";
-import { createGroupRoutes } from "./routes/group.routes";
-import { createLoanRoutes } from "./routes/loan.routes";
-import { createRepaymentRoutes } from "./routes/repayment.routes";
-import { HttpError } from "./utils/http-error";
+import { getContainer } from "./container.js";
+import { createAuthRoutes } from "./routes/auth.routes.js";
+import { createKycRoutes } from "./routes/kyc.routes.js";
+import { createDashboardRoutes } from "./routes/dashboard.routes.js";
+import { createDocRoutes } from "./routes/doc.routes.js";
+import { createGroupRoutes } from "./routes/group.routes.js";
+import { createLoanRoutes } from "./routes/loan.routes.js";
+import { createRepaymentRoutes } from "./routes/repayment.routes.js";
+import { HttpError } from "./utils/http-error.js";
 
 export function createApp(): Hono {
   const app = new Hono();

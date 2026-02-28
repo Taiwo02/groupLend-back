@@ -1,7 +1,7 @@
 import { Context } from "hono";
-import { RepaymentService } from "../services/repayment.service";
-import { recordRepaymentSchema } from "../validators/repayment.validator";
-import { parseWithSchema, readJsonBody } from "../utils/request";
+import { RepaymentService } from "../services/repayment.service.js";
+import { recordRepaymentSchema } from "../validators/repayment.validator.js";
+import { parseWithSchema, readJsonBody } from "../utils/request.js";
 
 export class RepaymentController {
   constructor(private readonly repaymentService: RepaymentService) {}

@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { GroupMemberRole, GroupMemberStatus } from "./enums";
+import { sequelize } from "../config/database.js";
+import { GroupMemberRole, GroupMemberStatus } from "./enums.js";
 
 export class GroupMember extends Model<
   InferAttributes<GroupMember>,

@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { UserKycOtp } from "../models";
-import type { NinLookupData } from "../types/nin";
+import { UserKycOtp } from "../models/index.js";
+import type { NinLookupData } from "../types/nin.js";
 
 export class UserKycOtpDao {
   findByUserId(userId: string, transaction?: Transaction): Promise<UserKycOtp | null> {

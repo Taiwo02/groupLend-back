@@ -1,13 +1,13 @@
 import { Transaction } from "sequelize";
-import { DbDao } from "../dao/db.dao";
-import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao";
-import { GroupDao } from "../dao/group.dao";
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { LoanApprovalDao } from "../dao/loan-approval.dao";
-import { LoanDao } from "../dao/loan.dao";
-import { RepaymentDao } from "../dao/repayment.dao";
-import { UserDao } from "../dao/user.dao";
-import { Loan } from "../models";
+import { DbDao } from "../dao/db.dao.js";
+import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao.js";
+import { GroupDao } from "../dao/group.dao.js";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { RepaymentDao } from "../dao/repayment.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { Loan } from "../models/index.js";
 import {
   ApprovalDecision,
   CredibilityLevel,
@@ -16,11 +16,11 @@ import {
   LoanStatus,
   MandateStatus,
   RepaymentStatus
-} from "../models/enums";
-import { HttpError } from "../utils/http-error";
-import { toNumber } from "../utils/number";
-import { EmailService } from "../email/email.service";
-import { NotificationService } from "./notification.service";
+} from "../models/enums.js";
+import { HttpError } from "../utils/http-error.js";
+import { toNumber } from "../utils/number.js";
+import { EmailService } from "../email/email.service.js";
+import { NotificationService } from "./notification.service.js";
 
 export type LoanRequestInput = {
   borrowerId: string;

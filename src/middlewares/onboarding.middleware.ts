@@ -1,7 +1,7 @@
 import { Context, Next } from "hono";
-import { UserDao } from "../dao/user.dao";
-import { KycStatus } from "../models/enums";
-import { HttpError } from "../utils/http-error";
+import { UserDao } from "../dao/user.dao.js";
+import { KycStatus } from "../models/enums.js";
+import { HttpError } from "../utils/http-error.js";
 
 export type OnboardingContext = Context & {
   var: {

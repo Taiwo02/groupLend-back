@@ -1,13 +1,13 @@
-import { KycStatus } from "../models/enums";
-import { UserDao } from "../dao/user.dao";
-import { UserKycDataDao } from "../dao/user-kyc-data.dao";
-import { UserKycOtpDao } from "../dao/user-kyc-otp.dao";
-import { StatementDao } from "../dao/statement.dao";
-import { HttpError } from "../utils/http-error";
-import { lookupNin } from "./nin.client";
-import { sendOtpToPhone } from "./otp-sender.service";
-import { generateOtp, hashOtp, verifyOtp, getOtpExpiry, isOtpExpired } from "../utils/otp";
-import { ninFullName, ninAddress, type NinLookupData } from "../types/nin";
+import { KycStatus } from "../models/enums.js";
+import { UserDao } from "../dao/user.dao.js";
+import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
+import { UserKycOtpDao } from "../dao/user-kyc-otp.dao.js";
+import { StatementDao } from "../dao/statement.dao.js";
+import { HttpError } from "../utils/http-error.js";
+import { lookupNin } from "./nin.client.js";
+import { sendOtpToPhone } from "./otp-sender.service.js";
+import { generateOtp, hashOtp, verifyOtp, getOtpExpiry, isOtpExpired } from "../utils/otp.js";
+import { ninFullName, ninAddress, type NinLookupData } from "../types/nin.js";
 
 /** KYC steps: 0 = NIN+OTP, 1 = verify OTP + name, 2 = confirm address, 3 = disbursement account, 4 = employment. Step 5 = submitted. */
 export const KYC_MAX_STEP = 5;

@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { LoanApproval } from "../models";
-import { ApprovalDecision } from "../models/enums";
+import { LoanApproval } from "../models/index.js";
+import { ApprovalDecision } from "../models/enums.js";
 
 export class LoanApprovalDao {
   createPendingApprovals(

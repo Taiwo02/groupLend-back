@@ -1,9 +1,9 @@
 import { Transaction } from "sequelize";
-import { GroupDao } from "../dao/group.dao";
-import { LoanDao } from "../dao/loan.dao";
-import { RepaymentDao } from "../dao/repayment.dao";
-import { LoanStatus, RepaymentStatus } from "../models/enums";
-import { toNumber } from "../utils/number";
+import { GroupDao } from "../dao/group.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { RepaymentDao } from "../dao/repayment.dao.js";
+import { LoanStatus, RepaymentStatus } from "../models/enums.js";
+import { toNumber } from "../utils/number.js";
 
 type QuarterPerformance = "perfect" | "minor_delay" | "default";
 

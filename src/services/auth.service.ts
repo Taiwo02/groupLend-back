@@ -1,14 +1,14 @@
-import { GroupDao } from "../dao/group.dao";
-import { GroupInviteDao } from "../dao/group-invite.dao";
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { UserDao } from "../dao/user.dao";
-import { User } from "../models";
-import { CreditStatus, KycStatus } from "../models/enums";
-import { GroupMemberRole, GroupMemberStatus } from "../models/enums";
-import { compareHash, hashValue, signJwt } from "../utils/auth";
-import { HttpError } from "../utils/http-error";
-import { EmailService } from "../email/email.service";
-import { CreditService } from "./credit.service";
+import { GroupDao } from "../dao/group.dao.js";
+import { GroupInviteDao } from "../dao/group-invite.dao.js";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { User } from "../models/index.js";
+import { CreditStatus, KycStatus } from "../models/enums.js";
+import { GroupMemberRole, GroupMemberStatus } from "../models/enums.js";
+import { compareHash, hashValue, signJwt } from "../utils/auth.js";
+import { HttpError } from "../utils/http-error.js";
+import { EmailService } from "../email/email.service.js";
+import { CreditService } from "./credit.service.js";
 
 export type OnboardingState = "INCOME_PENDING" | "ONBOARDING_COMPLETE";
 
@@ -139,7 +139,7 @@ export class AuthService {
     if (!user) throw new HttpError(404, "User not found");
     if (user.loanPinHash) throw new HttpError(409, "Loan PIN has already been set and cannot be changed");
     const loanPinHash = await hashValue(pin);
-    const { User } = await import("../models");
+    const { User } = await import("../models/index.js");
     await User.update({ loanPinHash }, { where: { id: userId } });
   }
 }

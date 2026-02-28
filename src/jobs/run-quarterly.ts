@@ -3,9 +3,9 @@
  * Run with: bun run src/jobs/run-quarterly.ts
  * Schedule with cron, e.g. 0 0 1 * * (first day of each month).
  */
-import { sequelize } from "../config/database";
-import { getContainer } from "../container";
-import { initModelAssociations } from "../models";
+import { sequelize } from "../config/database.js";
+import { getContainer } from "../container.js";
+import { initModelAssociations } from "../models/index.js";
 
 async function main() {
   await sequelize.authenticate();

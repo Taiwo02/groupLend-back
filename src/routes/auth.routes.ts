@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { AuthController } from "../controllers/auth.controller";
-import { requireAuth } from "../middlewares/auth.middleware";
+import type { AuthController } from "../controllers/auth.controller.js";
+import { requireAuth } from "../middlewares/auth.middleware.js";
 
 export function createAuthRoutes(authController: AuthController): Hono {
   const routes = new Hono();

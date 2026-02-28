@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { Notification } from "../models";
-import { NotificationType } from "../models/enums";
+import { Notification } from "../models/index.js";
+import { NotificationType } from "../models/enums.js";
 
 export class NotificationDao {
   create(

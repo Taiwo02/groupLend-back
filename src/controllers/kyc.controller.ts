@@ -1,10 +1,10 @@
 import { Context } from "hono";
-import { KycService } from "../services/kyc.service";
+import { KycService } from "../services/kyc.service.js";
 import {
   kycSubmitStepSchema,
   kycGoBackSchema
-} from "../validators/kyc.validator";
-import { parseWithSchema, readJsonBody } from "../utils/request";
+} from "../validators/kyc.validator.js";
+import { parseWithSchema, readJsonBody } from "../utils/request.js";
 
 export class KycController {
   constructor(private readonly kycService: KycService) {}

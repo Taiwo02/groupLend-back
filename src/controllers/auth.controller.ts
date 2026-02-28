@@ -1,13 +1,13 @@
 import { Context } from "hono";
-import { AuthService } from "../services/auth.service";
+import { AuthService } from "../services/auth.service.js";
 import {
   loginSchema,
   setLoanPinSchema,
   signupSchema,
   submitIncomeSchema
-} from "../validators/auth.validator";
-import { parseWithSchema, readJsonBody, z } from "../utils/request";
-import { sanitizeUser } from "../utils/serializers";
+} from "../validators/auth.validator.js";
+import { parseWithSchema, readJsonBody, z } from "../utils/request.js";
+import { sanitizeUser } from "../utils/serializers.js";
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { LoanPurpose, LoanStatus } from "./enums";
+import { sequelize } from "../config/database.js";
+import { LoanPurpose, LoanStatus } from "./enums.js";
 
 export class Loan extends Model<InferAttributes<Loan>, InferCreationAttributes<Loan>> {
   declare id: CreationOptional<string>;

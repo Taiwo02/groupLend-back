@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { User } from "../models";
-import { CreditStatus, KycStatus, TrustLevel } from "../models/enums";
+import { User } from "../models/index.js";
+import { CreditStatus, KycStatus, TrustLevel } from "../models/enums.js";
 
 export class UserDao {
   findByEmail(email: string): Promise<User | null> {

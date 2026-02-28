@@ -1,16 +1,16 @@
 import { Context } from "hono";
-import { UserDao } from "../dao/user.dao";
-import { ApprovalService } from "../services/approval.service";
-import { LoanService } from "../services/loan.service";
-import { verifyLoanPin } from "../utils/loan-pin";
-import { LoanPurpose } from "../models/enums";
+import { UserDao } from "../dao/user.dao.js";
+import { ApprovalService } from "../services/approval.service.js";
+import { LoanService } from "../services/loan.service.js";
+import { verifyLoanPin } from "../utils/loan-pin.js";
+import { LoanPurpose } from "../models/enums.js";
 import {
   approveLoanBodySchema,
   groupLoanSchema,
   individualLoanSchema,
   loanIdParamSchema
-} from "../validators/loan.validator";
-import { parseWithSchema, readJsonBody } from "../utils/request";
+} from "../validators/loan.validator.js";
+import { parseWithSchema, readJsonBody } from "../utils/request.js";
 
 export class LoanController {
   constructor(

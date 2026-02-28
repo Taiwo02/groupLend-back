@@ -1,8 +1,8 @@
 import { Transaction } from "sequelize";
-import { GroupDao } from "../dao/group.dao";
-import { UserDao } from "../dao/user.dao";
-import { CredibilityLevel, TrustLevel } from "../models/enums";
-import { toNumber } from "../utils/number";
+import { GroupDao } from "../dao/group.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { CredibilityLevel, TrustLevel } from "../models/enums.js";
+import { toNumber } from "../utils/number.js";
 
 const TRUST_SCORE_REPAYMENT_DELTA = 2;
 const TRUST_SCORE_DEFAULT_DELTA = -15;
@@ -81,7 +81,7 @@ export class TrustService {
         : trustScore >= TRUST_LEVEL_SILVER_MIN
           ? TrustLevel.SILVER
           : TrustLevel.BRONZE;
-    const { User } = await import("../models");
+    const { User } = await import("../models/index.js");
     await User.update(
       { trustScore: Number(trustScore.toFixed(2)), trustLevel: level },
       { where: { id: userId }, transaction }
@@ -97,7 +97,7 @@ export class TrustService {
       credibilityScore >= CREDIBILITY_VERIFIED_MIN
         ? CredibilityLevel.VERIFIED_TRUST_GROUP
         : CredibilityLevel.STANDARD;
-    const { Group } = await import("../models");
+    const { Group } = await import("../models/index.js");
     await Group.update(
       { credibilityScore: Number(credibilityScore.toFixed(2)), credibilityLevel: level },
       { where: { id: groupId }, transaction }

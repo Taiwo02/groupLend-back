@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { ApprovalDecision } from "./enums";
+import { sequelize } from "../config/database.js";
+import { ApprovalDecision } from "./enums.js";
 
 export class LoanApproval extends Model<
   InferAttributes<LoanApproval>,

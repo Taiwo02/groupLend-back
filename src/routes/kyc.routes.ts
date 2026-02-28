@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { KycController } from "../controllers/kyc.controller";
-import { requireAuth } from "../middlewares/auth.middleware";
+import type { KycController } from "../controllers/kyc.controller.js";
+import { requireAuth } from "../middlewares/auth.middleware.js";
 
 export function createKycRoutes(kycController: KycController): Hono {
   const routes = new Hono();

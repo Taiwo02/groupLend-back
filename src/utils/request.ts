@@ -1,6 +1,6 @@
 import { Context } from "hono";
 import { z, ZodType } from "zod";
-import { HttpError } from "./http-error";
+import { HttpError } from "./http-error.js";
 
 export const requireString = (value: unknown, field: string): string => {
   if (typeof value !== "string" || !value.trim()) {

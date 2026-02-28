@@ -1,6 +1,6 @@
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { UserDao } from "../dao/user.dao";
-import { toNumber } from "../utils/number";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { toNumber } from "../utils/number.js";
 
 export class CreditService {
   constructor(

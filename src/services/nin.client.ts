@@ -1,5 +1,5 @@
-import { env } from "../config/env";
-import type { NinLookupData, NinLookupResponse } from "../types/nin";
+import { env } from "../config/env.js";
+import type { NinLookupData, NinLookupResponse } from "../types/nin.js";
 
 /** Stub NIN response for when API is not configured or for testing */
 const STUB_NIN_DATA: NinLookupData = {

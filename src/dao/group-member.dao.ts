@@ -1,7 +1,7 @@
 import { Op } from "sequelize";
 import { Transaction } from "sequelize";
-import { GroupMember } from "../models";
-import { GroupMemberRole, GroupMemberStatus } from "../models/enums";
+import { GroupMember } from "../models/index.js";
+import { GroupMemberRole, GroupMemberStatus } from "../models/enums.js";
 
 export class GroupMemberDao {
   createMember(

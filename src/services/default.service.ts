@@ -1,11 +1,11 @@
-import { DbDao } from "../dao/db.dao";
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { LoanDao } from "../dao/loan.dao";
-import { UserDao } from "../dao/user.dao";
-import { EmailService } from "../email/email.service";
-import { GroupMemberStatus, LoanStatus } from "../models/enums";
-import { HttpError } from "../utils/http-error";
-import { toNumber } from "../utils/number";
+import { DbDao } from "../dao/db.dao.js";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { EmailService } from "../email/email.service.js";
+import { GroupMemberStatus, LoanStatus } from "../models/enums.js";
+import { HttpError } from "../utils/http-error.js";
+import { toNumber } from "../utils/number.js";
 
 export type GroupLiability = {
   memberId: string;

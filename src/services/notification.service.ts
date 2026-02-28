@@ -1,7 +1,7 @@
-import { NotificationDao } from "../dao/notification.dao";
-import { UserDao } from "../dao/user.dao";
-import { EmailService } from "../email/email.service";
-import { NotificationType } from "../models/enums";
+import { NotificationDao } from "../dao/notification.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { EmailService } from "../email/email.service.js";
+import { NotificationType } from "../models/enums.js";
 
 export class NotificationService {
   constructor(

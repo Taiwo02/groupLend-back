@@ -1,6 +1,6 @@
 import { Context, Next } from "hono";
-import { verifyJwt } from "../utils/auth";
-import { HttpError } from "../utils/http-error";
+import { verifyJwt } from "../utils/auth.js";
+import { HttpError } from "../utils/http-error.js";
 
 type AuthContext = Context & {
   var: {

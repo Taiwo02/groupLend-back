@@ -1,11 +1,11 @@
 import { Context } from "hono";
-import { GroupService } from "../services/group.service";
+import { GroupService } from "../services/group.service.js";
 import {
   createGroupSchema,
   groupIdParamSchema,
   inviteMembersSchema
-} from "../validators/group.validator";
-import { parseWithSchema, readJsonBody } from "../utils/request";
+} from "../validators/group.validator.js";
+import { parseWithSchema, readJsonBody } from "../utils/request.js";
 
 export class GroupController {
   constructor(private readonly groupService: GroupService) {}

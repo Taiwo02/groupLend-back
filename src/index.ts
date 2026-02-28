@@ -1,10 +1,10 @@
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
 import { serve } from "@hono/node-server";
-import { env } from "./config/env";
-import { sequelize } from "./config/database";
-import { initModelAssociations } from "./models";
-import { createApp } from "./app";
+import { env } from "./config/env.js";
+import { sequelize } from "./config/database.js";
+import { initModelAssociations } from "./models/index.js";
+import { createApp } from "./app.js";
 
 const bootstrap = async (): Promise<void> => {
   await sequelize.authenticate();

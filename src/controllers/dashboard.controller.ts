@@ -1,5 +1,5 @@
 import { Context } from "hono";
-import { DashboardService } from "../services/dashboard.service";
+import { DashboardService } from "../services/dashboard.service.js";
 
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

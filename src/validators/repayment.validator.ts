@@ -1,4 +1,4 @@
-import { z } from "../utils/request";
+import { z } from "../utils/request.js";
 
 export const recordRepaymentSchema = z.object({
   loanId: z.uuid("loanId must be a valid uuid"),

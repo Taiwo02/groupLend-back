@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import { Transaction } from "sequelize";
-import { GroupInvite } from "../models/group-invite.model";
+import { GroupInvite } from "../models/group-invite.model.js";
 
 export class GroupInviteDao {
   async create(

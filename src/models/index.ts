@@ -1,15 +1,15 @@
-import { DirectDebitMandate } from "./direct-debit-mandate.model";
-import { Group } from "./group.model";
-import { GroupInvite } from "./group-invite.model";
-import { GroupMember } from "./group-member.model";
-import { LoanApproval } from "./loan-approval.model";
-import { Loan } from "./loan.model";
-import { Notification } from "./notification.model";
-import { Repayment } from "./repayment.model";
-import { Statement } from "./statement.model";
-import { User } from "./user.model";
-import { UserKycData } from "./user-kyc-data.model";
-import { UserKycOtp } from "./user-kyc-otp.model";
+import { DirectDebitMandate } from "./direct-debit-mandate.model.js";
+import { Group } from "./group.model.js";
+import { GroupInvite } from "./group-invite.model.js";
+import { GroupMember } from "./group-member.model.js";
+import { LoanApproval } from "./loan-approval.model.js";
+import { Loan } from "./loan.model.js";
+import { Notification } from "./notification.model.js";
+import { Repayment } from "./repayment.model.js";
+import { Statement } from "./statement.model.js";
+import { User } from "./user.model.js";
+import { UserKycData } from "./user-kyc-data.model.js";
+import { UserKycOtp } from "./user-kyc-otp.model.js";
 
 export const initModelAssociations = (): void => {
   User.hasOne(UserKycData, { foreignKey: "userId", as: "kycData" });

@@ -1,5 +1,5 @@
-export { EmailService } from "./email.service";
-export { getMailTransport, isEmailConfigured } from "./transport";
+export { EmailService } from "./email.service.js";
+export { getMailTransport, isEmailConfigured } from "./transport.js";
 export {
   welcomeTemplate,
   groupInviteTemplate,
@@ -8,7 +8,7 @@ export {
   loanRejectionTemplate,
   repaymentReminderTemplate,
   defaultAlertTemplate
-} from "./templates";
+} from "./templates.js";
 export type {
   WelcomeTemplateVars,
   GroupInviteTemplateVars,
@@ -17,4 +17,4 @@ export type {
   LoanRejectionTemplateVars,
   RepaymentReminderTemplateVars,
   DefaultAlertTemplateVars
-} from "./templates";
+} from "./templates.js";

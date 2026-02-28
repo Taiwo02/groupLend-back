@@ -1,16 +1,16 @@
-import { LoanApprovalDao } from "../dao/loan-approval.dao";
-import { LoanDao } from "../dao/loan.dao";
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { GroupDao } from "../dao/group.dao";
-import { UserDao } from "../dao/user.dao";
-import { StatementDao } from "../dao/statement.dao";
-import { RepaymentDao } from "../dao/repayment.dao";
-import { NotificationDao } from "../dao/notification.dao";
-import { ApprovalDecision, KycStatus, LoanStatus } from "../models/enums";
-import { toNumber } from "../utils/number";
-import { HttpError } from "../utils/http-error";
-import type { User } from "../models";
-import type { Statement } from "../models";
+import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { GroupDao } from "../dao/group.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { StatementDao } from "../dao/statement.dao.js";
+import { RepaymentDao } from "../dao/repayment.dao.js";
+import { NotificationDao } from "../dao/notification.dao.js";
+import { ApprovalDecision, KycStatus, LoanStatus } from "../models/enums.js";
+import { toNumber } from "../utils/number.js";
+import { HttpError } from "../utils/http-error.js";
+import type { User } from "../models/index.js";
+import type { Statement } from "../models/index.js";
 
 // --- Onboarding view (some or all have not completed KYC) ---
 export type RevenueStatus = "verified" | "pending";
@@ -276,13 +276,13 @@ export class DashboardService {
   }
 
   private async getPendingPeerApprovals(userId: string): Promise<PendingPeerApproval[]> {
-    const { LoanApproval, Loan } = await import("../models");
+    const { LoanApproval, Loan } = await import("../models/index.js");
     const pending = await LoanApproval.findAll({
       where: { approverId: userId, decision: ApprovalDecision.PENDING },
       attributes: ["loanId"]
     });
     if (pending.length === 0) return [];
-    const loanIds = pending.map((a) => a.loanId);
+    const loanIds = pending.map((a: { loanId: string }) => a.loanId);
     const loans = await Loan.findAll({
       where: { id: loanIds, status: LoanStatus.PENDING_APPROVAL },
       include: [{ association: "borrower" }]
@@ -315,7 +315,7 @@ export class DashboardService {
   }
 
   private async getActiveLoansCount(userId: string): Promise<number> {
-    const { Loan } = await import("../models");
+    const { Loan } = await import("../models/index.js");
     return Loan.count({
       where: {
         borrowerId: userId,
@@ -325,14 +325,14 @@ export class DashboardService {
   }
 
   private async getPendingApprovalsCount(userId: string): Promise<number> {
-    const { LoanApproval } = await import("../models");
+    const { LoanApproval } = await import("../models/index.js");
     const pending = await LoanApproval.findAll({
       where: { approverId: userId, decision: ApprovalDecision.PENDING },
       attributes: ["loanId"]
     });
     if (pending.length === 0) return 0;
-    const loanIds = pending.map((a) => a.loanId);
-    const { Loan } = await import("../models");
+    const loanIds = pending.map((a: { loanId: string }) => a.loanId);
+    const { Loan } = await import("../models/index.js");
     return Loan.count({
       where: { id: loanIds, status: LoanStatus.PENDING_APPROVAL }
     });

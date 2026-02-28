@@ -1,4 +1,4 @@
-import { undoMigrations } from "./migrate";
+import { undoMigrations } from "./migrate.js";
 
 undoMigrations()
   .then(() => {

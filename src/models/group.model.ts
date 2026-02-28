@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { CredibilityLevel, GroupStatus, InterestType, RepaymentType } from "./enums";
+import { sequelize } from "../config/database.js";
+import { CredibilityLevel, GroupStatus, InterestType, RepaymentType } from "./enums.js";
 
 export class Group extends Model<InferAttributes<Group>, InferCreationAttributes<Group>> {
   declare id: CreationOptional<string>;

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { GroupController } from "../controllers/group.controller";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { GroupController } from "../controllers/group.controller.js";
 
 export function createGroupRoutes(groupController: GroupController): Hono {
   const routes = new Hono();

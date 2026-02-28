@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { Loan } from "../models";
-import { LoanStatus } from "../models/enums";
+import { Loan } from "../models/index.js";
+import { LoanStatus } from "../models/enums.js";
 
 export class LoanDao {
   createLoan(
@@ -10,7 +10,7 @@ export class LoanDao {
       amount: number;
       interestRate: number;
       tenorMonths: number;
-      loanPurpose?: import("../models/enums").LoanPurpose | null;
+      loanPurpose?: import("../models/enums.js").LoanPurpose | null;
       status: LoanStatus;
       outstandingBalance: number;
     },

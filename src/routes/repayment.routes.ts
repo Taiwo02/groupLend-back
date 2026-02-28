@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { RepaymentController } from "../controllers/repayment.controller";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { RepaymentController } from "../controllers/repayment.controller.js";
 
 export function createRepaymentRoutes(repaymentController: RepaymentController): Hono {
   const routes = new Hono();

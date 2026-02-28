@@ -3,9 +3,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { Umzug } from "umzug";
 import { SequelizeStorage } from "umzug";
-import { sequelize } from "./config/database";
-import type { MigrationContext } from "./migrations/types";
-import { initModelAssociations } from "./models";
+import { sequelize } from "./config/database.js";
+import type { MigrationContext } from "./migrations/types.js";
+import { initModelAssociations } from "./models/index.js";
 
 async function loadMigrations(context: MigrationContext) {
   initModelAssociations();

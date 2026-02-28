@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { hashValue, compareHash } from "./auth";
+import { hashValue, compareHash } from "./auth.js";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;

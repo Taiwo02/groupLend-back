@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { Transaction } from "sequelize";
-import { DbDao } from "../dao/db.dao";
-import { GroupDao } from "../dao/group.dao";
-import { GroupInviteDao } from "../dao/group-invite.dao";
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { UserDao } from "../dao/user.dao";
-import { Group, GroupInvite, GroupMember } from "../models";
-import { GroupMemberRole, GroupMemberStatus } from "../models/enums";
-import { HttpError } from "../utils/http-error";
-import { EmailService } from "../email/email.service";
-import { CreditService } from "./credit.service";
-import { NotificationService } from "./notification.service";
+import { DbDao } from "../dao/db.dao.js";
+import { GroupDao } from "../dao/group.dao.js";
+import { GroupInviteDao } from "../dao/group-invite.dao.js";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { Group, GroupInvite, GroupMember } from "../models/index.js";
+import { GroupMemberRole, GroupMemberStatus } from "../models/enums.js";
+import { HttpError } from "../utils/http-error.js";
+import { EmailService } from "../email/email.service.js";
+import { CreditService } from "./credit.service.js";
+import { NotificationService } from "./notification.service.js";
 
 export type InviteeInput = { fullName: string; email: string; phone?: string };
 

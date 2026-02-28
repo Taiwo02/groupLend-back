@@ -1,6 +1,6 @@
 import { Op, Transaction } from "sequelize";
-import { Loan, Repayment } from "../models";
-import { RepaymentStatus } from "../models/enums";
+import { Loan, Repayment } from "../models/index.js";
+import { RepaymentStatus } from "../models/enums.js";
 
 export class RepaymentDao {
   countByLoanId(loanId: string, transaction: Transaction): Promise<number> {

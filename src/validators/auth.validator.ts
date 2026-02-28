@@ -1,4 +1,4 @@
-import { z } from "../utils/request";
+import { z } from "../utils/request.js";
 
 export const signupSchema = z.object({
   fullName: z.string().trim().min(2, "fullName is required"),

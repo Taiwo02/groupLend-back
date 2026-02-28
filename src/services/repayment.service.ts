@@ -1,12 +1,12 @@
-import { DbDao } from "../dao/db.dao";
-import { GroupDao } from "../dao/group.dao";
-import { LoanDao } from "../dao/loan.dao";
-import { RepaymentDao } from "../dao/repayment.dao";
-import { Loan } from "../models";
-import { LoanStatus, RepaymentStatus } from "../models/enums";
-import { HttpError } from "../utils/http-error";
-import { toNumber } from "../utils/number";
-import { TrustService } from "./trust.service";
+import { DbDao } from "../dao/db.dao.js";
+import { GroupDao } from "../dao/group.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { RepaymentDao } from "../dao/repayment.dao.js";
+import { Loan } from "../models/index.js";
+import { LoanStatus, RepaymentStatus } from "../models/enums.js";
+import { HttpError } from "../utils/http-error.js";
+import { toNumber } from "../utils/number.js";
+import { TrustService } from "./trust.service.js";
 
 export type RecordRepaymentInput = {
   loanId: string;

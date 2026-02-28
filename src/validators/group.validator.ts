@@ -1,4 +1,4 @@
-import { z } from "../utils/request";
+import { z } from "../utils/request.js";
 
 const repaymentTypeEnum = z.enum(["daily", "weekly", "monthly", "quarterly", "yearly"]);
 const interestTypeEnum = z.enum(["flat", "reducingBalance"]);

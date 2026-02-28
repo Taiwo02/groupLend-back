@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { NotificationType } from "./enums";
+import { sequelize } from "../config/database.js";
+import { NotificationType } from "./enums.js";
 
 export class Notification extends Model<
   InferAttributes<Notification>,

@@ -1,4 +1,4 @@
-import { z } from "../utils/request";
+import { z } from "../utils/request.js";
 
 export const loanIdParamSchema = z.object({
   id: z.uuid("loan id must be a valid uuid")

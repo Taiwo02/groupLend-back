@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middlewares/auth.middleware";
-import type { DashboardController } from "../controllers/dashboard.controller";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import type { DashboardController } from "../controllers/dashboard.controller.js";
 
 type OnboardingMiddleware = (
   c: import("hono").Context,

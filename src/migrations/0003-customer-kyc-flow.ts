@@ -1,4 +1,4 @@
-import type { MigrationContext } from "./types";
+import type { MigrationContext } from "./types.js";
 
 export async function up({ context }: { context: MigrationContext }): Promise<void> {
   const q = context.sequelize.query.bind(context.sequelize);

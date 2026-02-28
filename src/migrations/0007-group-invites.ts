@@ -1,4 +1,4 @@
-import type { MigrationContext } from "./types";
+import type { MigrationContext } from "./types.js";
 
 async function addFkIfNotExists(
   context: MigrationContext,

@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { CreditStatus, KycStatus, TrustLevel } from "./enums";
+import { sequelize } from "../config/database.js";
+import { CreditStatus, KycStatus, TrustLevel } from "./enums.js";
 
 export class User extends Model<InferAttributes<User>, InferCreationAttributes<User>> {
   declare id: CreationOptional<string>;

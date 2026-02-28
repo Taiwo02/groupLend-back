@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import { Transaction } from "sequelize";
-import { Statement } from "../models";
+import { Statement } from "../models/index.js";
 
 export class StatementDao {
   findByUserId(userId: string, transaction?: Transaction): Promise<Statement | null> {

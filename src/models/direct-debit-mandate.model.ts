@@ -5,8 +5,8 @@ import {
   InferCreationAttributes,
   Model
 } from "sequelize";
-import { sequelize } from "../config/database";
-import { MandateStatus } from "./enums";
+import { sequelize } from "../config/database.js";
+import { MandateStatus } from "./enums.js";
 
 export class DirectDebitMandate extends Model<
   InferAttributes<DirectDebitMandate>,

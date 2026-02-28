@@ -1,6 +1,6 @@
-import { UserDao } from "../dao/user.dao";
-import { compareHash } from "./auth";
-import { HttpError } from "./http-error";
+import { UserDao } from "../dao/user.dao.js";
+import { compareHash } from "./auth.js";
+import { HttpError } from "./http-error.js";
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000; // 15 min

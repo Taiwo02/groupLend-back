@@ -1,4 +1,4 @@
-import { z } from "../utils/request";
+import { z } from "../utils/request.js";
 
 /** Step 0: NIN lookup – we send OTP to phone on NIN */
 export const kycStepZeroSchema = z.object({

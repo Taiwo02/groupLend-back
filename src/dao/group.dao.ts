@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
-import { Group, Loan } from "../models";
-import { CredibilityLevel, GroupStatus, LoanStatus } from "../models/enums";
+import { Group, Loan } from "../models/index.js";
+import { CredibilityLevel, GroupStatus, LoanStatus } from "../models/enums.js";
 
 export class GroupDao {
   createGroup(

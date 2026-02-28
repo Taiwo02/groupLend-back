@@ -1,16 +1,16 @@
-import { DbDao } from "../dao/db.dao";
-import { GroupMemberDao } from "../dao/group-member.dao";
-import { LoanApprovalDao } from "../dao/loan-approval.dao";
-import { LoanDao } from "../dao/loan.dao";
-import { UserDao } from "../dao/user.dao";
-import { Loan } from "../models";
-import { ApprovalDecision, LoanStatus } from "../models/enums";
-import { GroupMemberStatus } from "../models/enums";
-import { HttpError } from "../utils/http-error";
-import { EmailService } from "../email/email.service";
-import { LoanService } from "./loan.service";
-import { NotificationService } from "./notification.service";
-import { TrustService } from "./trust.service";
+import { DbDao } from "../dao/db.dao.js";
+import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { Loan } from "../models/index.js";
+import { ApprovalDecision, LoanStatus } from "../models/enums.js";
+import { GroupMemberStatus } from "../models/enums.js";
+import { HttpError } from "../utils/http-error.js";
+import { EmailService } from "../email/email.service.js";
+import { LoanService } from "./loan.service.js";
+import { NotificationService } from "./notification.service.js";
+import { TrustService } from "./trust.service.js";
 
 export class ApprovalService {
   constructor(
