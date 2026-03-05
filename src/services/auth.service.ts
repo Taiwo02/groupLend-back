@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { GroupDao } from "../dao/group.dao.js";
 import { GroupInviteDao } from "../dao/group-invite.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
@@ -7,6 +8,7 @@ import { CreditStatus, KycStatus } from "../models/enums.js";
 import { GroupMemberRole, GroupMemberStatus } from "../models/enums.js";
 import { compareHash, hashValue, signJwt } from "../utils/auth.js";
 import { HttpError } from "../utils/http-error.js";
+import { env } from "../config/env.js";
 import { EmailService } from "../email/email.service.js";
 import { CreditService } from "./credit.service.js";
 
@@ -43,9 +45,8 @@ export class AuthService {
   ) {}
 
   async signup(input: SignupInput): Promise<{
-    token: string;
     user: User;
-    onboardingState: OnboardingState;
+    message: string;
   }> {
     const normalizedEmail = input.email.toLowerCase();
     const existing = await this.userDao.findByEmail(normalizedEmail);
@@ -53,6 +54,9 @@ export class AuthService {
 
     const passwordHash = await hashValue(input.password);
     const creditLimit = this.creditService.calculateIndividualCreditLimit(input.monthlyIncome);
+
+    const emailVerificationToken = randomBytes(32).toString("hex");
+    const emailVerificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = await this.userDao.createUser({
       fullName: input.fullName,
@@ -64,7 +68,10 @@ export class AuthService {
       monthlyIncome: input.monthlyIncome,
       creditLimit,
       kycStatus: KycStatus.PENDING,
-      creditStatus: CreditStatus.ACTIVE
+      creditStatus: CreditStatus.ACTIVE,
+      emailVerified: false,
+      emailVerificationToken,
+      emailVerificationTokenExpiresAt
     });
 
     const pendingInvites = await this.groupInviteDao.findPendingByEmail(normalizedEmail);
@@ -82,10 +89,30 @@ export class AuthService {
       await this.groupDao.updateCreditPool(acceptedInvite.groupId, pool);
     }
 
-    const token = signJwt({ sub: user.id, email: user.email });
-    const onboardingState: OnboardingState = "ONBOARDING_COMPLETE";
-    this.emailService.sendWelcome(user.email, { fullName: user.fullName }).catch(() => {});
-    return { token, user, onboardingState };
+    const baseUrl = env.frontendUrl.replace(/\/$/, "") || "#";
+    const verifyUrl = baseUrl !== "#" ? `${baseUrl}/verify-email?token=${emailVerificationToken}` : "#";
+    this.emailService
+      .sendWelcome(user.email, {
+        fullName: user.fullName,
+        baseUrl: env.frontendUrl,
+        verifyUrl
+      })
+      .catch(() => {});
+
+    return {
+      user,
+      message: "Please verify your email. Check your inbox for the verification link."
+    };
+  }
+
+  /** Verify email using the token sent in the welcome email. Allows user to sign in after. */
+  async verifyEmail(token: string): Promise<{ user: User }> {
+    const user = await this.userDao.findByEmailVerificationToken(token);
+    if (!user) throw new HttpError(400, "Invalid or expired verification link");
+    await this.userDao.markEmailVerified(user.id);
+    const updated = await this.userDao.findById(user.id);
+    if (!updated) throw new HttpError(500, "User not found after verification");
+    return { user: updated };
   }
 
   async login(input: LoginInput): Promise<{
@@ -95,6 +122,10 @@ export class AuthService {
   }> {
     const user = await this.userDao.findByEmail(input.email.toLowerCase());
     if (!user) throw new HttpError(401, "Invalid credentials");
+
+    if (!user.emailVerified) {
+      throw new HttpError(403, "Please verify your email before signing in. Check your inbox for the verification link.");
+    }
 
     const valid = await compareHash(input.password, user.passwordHash);
     if (!valid) throw new HttpError(401, "Invalid credentials");

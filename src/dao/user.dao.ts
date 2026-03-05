@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import { Transaction } from "sequelize";
 import { GroupMember, User } from "../models/index.js";
 import { CreditStatus, KycStatus, TrustLevel } from "../models/enums.js";
@@ -29,13 +30,40 @@ export class UserDao {
     trustScore?: number;
     trustLevel?: TrustLevel;
     kycStep?: number;
+    emailVerified?: boolean;
+    emailVerificationToken?: string | null;
+    emailVerificationTokenExpiresAt?: Date | null;
   }): Promise<User> {
     return User.create({
       ...payload,
       trustScore: payload.trustScore ?? 0,
       trustLevel: payload.trustLevel ?? TrustLevel.BRONZE,
-      kycStep: payload.kycStep ?? 0
+      kycStep: payload.kycStep ?? 0,
+      emailVerified: payload.emailVerified ?? false,
+      emailVerificationToken: payload.emailVerificationToken ?? null,
+      emailVerificationTokenExpiresAt: payload.emailVerificationTokenExpiresAt ?? null
     });
+  }
+
+  findByEmailVerificationToken(token: string): Promise<User | null> {
+    const now = new Date();
+    return User.findOne({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: { [Op.gt]: now }
+      }
+    });
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await User.update(
+      {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null
+      },
+      { where: { id: userId } }
+    );
   }
 
   async updateProfile(

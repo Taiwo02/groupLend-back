@@ -24,7 +24,9 @@ export const env = {
   mailFromName: process.env.MAIL_FROM_NAME ?? "noreply",
   appName: process.env.APP_NAME ?? "Enlace Group Loan",
   /** Comma-separated allowed origins for CORS (e.g. https://app.example.com). If unset, allows any origin (*). */
-  corsOrigin: process.env.CORS_ORIGIN
+  corsOrigin: process.env.CORS_ORIGIN,
+  /** Frontend base URL for email links (e.g. https://app.enlace.ng). Used in welcome and other templates. */
+  frontendUrl: process.env.FRONTEND_URL ?? ""
 };
 
 if (!env.databaseUrl) {

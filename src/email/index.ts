@@ -8,7 +8,7 @@ export {
   loanRejectionTemplate,
   repaymentReminderTemplate,
   defaultAlertTemplate
-} from "./templates.js";
+} from "./templates/index.js";
 export type {
   WelcomeTemplateVars,
   GroupInviteTemplateVars,
@@ -17,4 +17,4 @@ export type {
   LoanRejectionTemplateVars,
   RepaymentReminderTemplateVars,
   DefaultAlertTemplateVars
-} from "./templates.js";
+} from "./templates/index.js";

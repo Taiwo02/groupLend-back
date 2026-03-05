@@ -23,3 +23,7 @@ export const submitIncomeSchema = z.object({
 export const setLoanPinSchema = z.object({
   pin: z.string().length(4, "PIN must be 4 digits").regex(/^\d{4}$/, "PIN must be 4 digits")
 });
+
+export const verifyEmailSchema = z.object({
+  token: z.string().trim().min(1, "Verification token is required")
+});

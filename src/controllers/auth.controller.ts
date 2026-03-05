@@ -4,7 +4,8 @@ import {
   loginSchema,
   setLoanPinSchema,
   signupSchema,
-  submitIncomeSchema
+  submitIncomeSchema,
+  verifyEmailSchema
 } from "../validators/auth.validator.js";
 import { parseWithSchema, readJsonBody, z } from "../utils/request.js";
 import { sanitizeUser } from "../utils/serializers.js";
@@ -24,11 +25,13 @@ export class AuthController {
       monthlyIncome: payload.monthlyIncome,
       employmentStatus: payload.employmentStatus
     });
-    return c.json({
-      token: result.token,
-      user: sanitizeUser(result.user),
-      onboardingState: result.onboardingState
-    });
+    return c.json(
+      {
+        user: sanitizeUser(result.user),
+        message: result.message
+      },
+      201
+    );
   }
 
   async login(c: Context): Promise<Response> {
@@ -60,5 +63,21 @@ export class AuthController {
     const payload = parseWithSchema(setLoanPinSchema, body) as z.infer<typeof setLoanPinSchema>;
     await this.authService.setLoanPin(c.get("userId"), payload.pin);
     return c.json({ message: "Loan PIN set successfully" });
+  }
+
+  async verifyEmail(c: Context): Promise<Response> {
+    const queryToken = c.req.query("token");
+    const token =
+      typeof queryToken === "string" && queryToken.length > 0
+        ? queryToken
+        : c.req.method === "POST"
+          ? (await readJsonBody<Record<string, unknown>>(c).then((b) => (b?.token as string) ?? ""))
+          : "";
+    const payload = parseWithSchema(verifyEmailSchema, { token });
+    const result = await this.authService.verifyEmail(payload.token);
+    return c.json({
+      message: "Email verified successfully. You can now sign in.",
+      user: sanitizeUser(result.user)
+    });
   }
 }

@@ -14,7 +14,7 @@ import {
   type LoanRejectionTemplateVars,
   type RepaymentReminderTemplateVars,
   type DefaultAlertTemplateVars
-} from "./templates.js";
+} from "./templates/index.js";
 import { env } from "../config/env.js";
 
 export class EmailService {

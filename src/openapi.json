@@ -9,7 +9,7 @@
   "servers": [{ "url": "/", "description": "API root" }],
   "tags": [
     { "name": "Health", "description": "Health check" },
-    { "name": "Auth", "description": "Signup, login, income, PIN" },
+    { "name": "Auth", "description": "Signup, verify email, login, income, PIN" },
     { "name": "KYC", "description": "Customer KYC step-by-step flow and go-back" },
     { "name": "Dashboard", "description": "Aggregated user dashboard" },
     { "name": "Groups", "description": "Groups and members" },
@@ -50,22 +50,80 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Created",
+          "201": {
+            "description": "Created. A verification email was sent; user must verify email before logging in.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "token": { "type": "string" },
                     "user": { "$ref": "#/components/schemas/User" },
-                    "onboardingState": { "type": "string", "enum": ["INCOME_PENDING", "ONBOARDING_COMPLETE"] }
+                    "message": { "type": "string", "description": "e.g. Please verify your email. Check your inbox for the verification link." }
                   }
                 }
               }
             }
           },
           "409": { "description": "Email already exists" }
+        }
+      }
+    },
+    "/auth/verify-email": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Verify email (from link in welcome email)",
+        "parameters": [
+          { "name": "token", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Verification token from the welcome email link" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email verified. User can now sign in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid or expired verification link" }
+        }
+      },
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Verify email (token in body)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": { "token": { "type": "string", "description": "Verification token from the welcome email" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified. User can now sign in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid or expired verification link" }
         }
       }
     },
@@ -104,7 +162,8 @@
               }
             }
           },
-          "401": { "description": "Invalid credentials" }
+          "401": { "description": "Invalid credentials" },
+          "403": { "description": "Email not verified; user must verify email before signing in" }
         }
       }
     },

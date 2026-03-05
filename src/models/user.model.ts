@@ -24,6 +24,9 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   declare loanPinHash: string | null;
   declare trustScore: number;
   declare trustLevel: TrustLevel;
+  declare emailVerified: boolean;
+  declare emailVerificationToken: string | null;
+  declare emailVerificationTokenExpiresAt: Date | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -98,6 +101,19 @@ User.init(
       type: DataTypes.ENUM(...Object.values(TrustLevel)),
       allowNull: false,
       defaultValue: TrustLevel.BRONZE
+    },
+    emailVerified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    emailVerificationToken: {
+      type: DataTypes.STRING(64),
+      allowNull: true
+    },
+    emailVerificationTokenExpiresAt: {
+      type: DataTypes.DATE,
+      allowNull: true
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE
