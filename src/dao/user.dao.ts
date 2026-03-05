@@ -1,10 +1,10 @@
 import { Transaction } from "sequelize";
-import { User } from "../models/index.js";
+import { GroupMember, User } from "../models/index.js";
 import { CreditStatus, KycStatus, TrustLevel } from "../models/enums.js";
 
 export class UserDao {
   findByEmail(email: string): Promise<User | null> {
-    return User.findOne({ where: { email } });
+    return User.findOne({ where: { email }, include: [{ model: GroupMember, as: "groups" }] });
   }
 
   findById(id: string, transaction?: Transaction): Promise<User | null> {

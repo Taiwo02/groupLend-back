@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { getContainer } from "./container.js";
+import { env } from "./config/env.js";
 import { createAuthRoutes } from "./routes/auth.routes.js";
 import { createKycRoutes } from "./routes/kyc.routes.js";
 import { createDashboardRoutes } from "./routes/dashboard.routes.js";
@@ -13,6 +15,20 @@ import { HttpError } from "./utils/http-error.js";
 export function createApp(): Hono {
   const app = new Hono();
   const container = getContainer();
+
+  const allowedOrigins = env.corsOrigin
+    ? env.corsOrigin.split(",").map((o) => o.trim()).filter(Boolean)
+    : ["*"];
+  app.use(
+    "*",
+    cors({
+      origin: allowedOrigins.length === 1 && allowedOrigins[0] === "*" ? "*" : allowedOrigins,
+      allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Authorization"],
+      credentials: allowedOrigins[0] !== "*",
+      maxAge: 86400
+    })
+  );
 
   app.get("/health", (c) => c.json({ ok: true, service: "Enlace Lending API" }));
 

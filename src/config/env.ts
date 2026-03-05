@@ -22,7 +22,9 @@ export const env = {
   zohoToken: process.env.ZOHO_TOKEN ?? "",
   mailFrom: process.env.MAIL_FROM ?? "info@enlace.ng",
   mailFromName: process.env.MAIL_FROM_NAME ?? "noreply",
-  appName: process.env.APP_NAME ?? "Enlace Group Loan"
+  appName: process.env.APP_NAME ?? "Enlace Group Loan",
+  /** Comma-separated allowed origins for CORS (e.g. https://app.example.com). If unset, allows any origin (*). */
+  corsOrigin: process.env.CORS_ORIGIN
 };
 
 if (!env.databaseUrl) {

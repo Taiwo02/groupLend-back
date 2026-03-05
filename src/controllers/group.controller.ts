@@ -31,7 +31,8 @@ export class GroupController {
       gracePeriodType: payload.gracePeriodType,
       overGracePenalCharges: payload.overGracePenalCharges,
       ageRange: payload.ageRange,
-      status: payload.status
+      status: payload.status,
+      members: payload.members
     });
     return c.json(group, 201);
   }

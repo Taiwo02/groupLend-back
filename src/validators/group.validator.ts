@@ -8,6 +8,12 @@ export const groupIdParamSchema = z.object({
   id: z.uuid("group id must be a valid uuid")
 });
 
+const inviteeSchema = z.object({
+  fullName: z.string().trim().min(1, "fullName is required"),
+  email: z.string().email("valid email is required"),
+  phone: z.string().trim().optional()
+});
+
 export const createGroupSchema = z.object({
   name: z.string().trim().min(2, "name is required"),
   description: z.string().trim().min(1, "description is required"),
@@ -25,13 +31,8 @@ export const createGroupSchema = z.object({
   gracePeriodType: z.string().trim().max(20).optional(),
   overGracePenalCharges: z.coerce.number().nonnegative().optional(),
   ageRange: z.array(z.string().trim()).optional(),
-  status: groupStatusEnum.optional()
-});
-
-const inviteeSchema = z.object({
-  fullName: z.string().trim().min(1, "fullName is required"),
-  email: z.string().email("valid email is required"),
-  phone: z.string().trim().optional()
+  status: groupStatusEnum.optional(),
+  members: z.array(inviteeSchema).optional()
 });
 
 export const inviteMembersSchema = z.object({

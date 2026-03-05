@@ -33,6 +33,7 @@ export type CreateGroupInput = {
   overGracePenalCharges?: number | null;
   ageRange?: string[];
   status?: string;
+  members?: InviteeInput[];
 };
 
 export class GroupService {
@@ -48,7 +49,10 @@ export class GroupService {
   ) {}
 
   async createGroup(input: CreateGroupInput): Promise<Group> {
-    return this.dbDao.withTransaction(async (transaction: Transaction) => {
+    const result = await this.dbDao.withTransaction<{
+      group: Group;
+      inviteEmails: Array<{ email: string; recipientName: string; existingUserId?: string }>;
+    }>(async (transaction: Transaction) => {
       const groupId = randomUUID();
       const group = await this.groupDao.createGroup(
         {
@@ -99,8 +103,57 @@ export class GroupService {
         transaction
       );
 
-      return group;
+      const inviteEmails: Array<{ email: string; recipientName: string; existingUserId?: string }> = [];
+      const members = input.members ?? [];
+      for (const inv of members) {
+        const email = inv.email.toLowerCase().trim();
+        const existingUser = await this.userDao.findByEmail(email);
+
+        if (existingUser) {
+          const activeGroupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(existingUser.id, transaction);
+          if (activeGroupIds.length > 0) {
+            throw new HttpError(400, "This person already belongs to a group");
+          }
+          const existingMember = await this.groupMemberDao.findByGroupAndUser(group.id, existingUser.id, transaction);
+          if (existingMember) {
+            throw new HttpError(400, "This person is already a member or has been invited to this group");
+          }
+          await this.groupMemberDao.findOrCreateInvitedMember(group.id, existingUser.id, transaction);
+          inviteEmails.push({ email, recipientName: existingUser.fullName, existingUserId: existingUser.id });
+        } else {
+          await this.groupInviteDao.create(
+            {
+              groupId: group.id,
+              email,
+              fullName: inv.fullName.trim(),
+              phone: inv.phone?.trim() ?? null,
+              invitedBy: input.creatorId
+            },
+            transaction
+          );
+          inviteEmails.push({ email, recipientName: inv.fullName.trim() });
+        }
+      }
+
+      return { group, inviteEmails };
     });
+
+    const inviter = await this.userDao.findById(input.creatorId);
+    for (const { email, recipientName } of result.inviteEmails) {
+      this.emailService
+        .sendGroupInvite(email, {
+          recipientName,
+          groupName: result.group.name,
+          inviterName: inviter?.fullName
+        })
+        .catch(() => {});
+    }
+    for (const { existingUserId } of result.inviteEmails) {
+      if (existingUserId) {
+        this.notificationService.notifyGroupInvite(existingUserId, result.group.name).catch(() => {});
+      }
+    }
+    return result.group;
   }
 
   /**
