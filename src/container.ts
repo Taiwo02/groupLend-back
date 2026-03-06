@@ -1,5 +1,6 @@
 import { sequelize } from "./config/database.js";
 import { AuthController } from "./controllers/auth.controller.js";
+import { InvitationController } from "./controllers/invitation.controller.js";
 import { KycController } from "./controllers/kyc.controller.js";
 import { DashboardController } from "./controllers/dashboard.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
@@ -25,6 +26,7 @@ import { KycService } from "./services/kyc.service.js";
 import { CreditService } from "./services/credit.service.js";
 import { DashboardService } from "./services/dashboard.service.js";
 import { GroupService } from "./services/group.service.js";
+import { InvitationService } from "./services/invitation.service.js";
 import { NotificationService } from "./services/notification.service.js";
 import { LoanService } from "./services/loan.service.js";
 import { QuarterlyService } from "./services/quarterly.service.js";
@@ -93,6 +95,15 @@ function createContainer() {
     notificationService,
     emailService
   );
+  const invitationService = new InvitationService(
+    dbDao,
+    groupInviteDao,
+    groupMemberDao,
+    groupDao,
+    userDao,
+    creditService,
+    emailService
+  );
   const repaymentService = new RepaymentService(
     dbDao,
     loanDao,
@@ -113,6 +124,7 @@ function createContainer() {
   );
 
   const authController = new AuthController(authService);
+  const invitationController = new InvitationController(invitationService);
   const kycService = new KycService(userDao, userKycDataDao, userKycOtpDao, statementDao);
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
@@ -134,6 +146,7 @@ function createContainer() {
     sequelize,
     emailService,
     authController,
+    invitationController,
     kycController,
     dashboardController,
     loanController,

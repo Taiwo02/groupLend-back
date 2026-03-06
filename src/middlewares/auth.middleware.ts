@@ -22,3 +22,18 @@ export const requireAuth = async (c: AuthContext, next: Next): Promise<void> => 
   c.set("userEmail", payload.email);
   await next();
 };
+
+/** Sets userId and userEmail if valid Bearer token present; does not require auth. */
+export const optionalAuth = async (c: Context, next: Next): Promise<void> => {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const payload = verifyJwt(authHeader.slice(7));
+      c.set("userId", payload.sub);
+      c.set("userEmail", payload.email);
+    } catch {
+      // ignore invalid token
+    }
+  }
+  await next();
+};

@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import { env } from "../config/env.js";
 import { Transaction } from "sequelize";
 import { DbDao } from "../dao/db.dao.js";
 import { GroupDao } from "../dao/group.dao.js";
@@ -48,10 +49,16 @@ export class GroupService {
     private readonly emailService: EmailService
   ) {}
 
+  /** 12-char hex token for member-invitation links. */
+  private generateInvitationToken(): string {
+    return randomBytes(6).toString("hex");
+  }
+
   async createGroup(input: CreateGroupInput): Promise<Group> {
+    const baseUrl = env.frontendUrl.replace(/\/$/, "") || "";
     const result = await this.dbDao.withTransaction<{
       group: Group;
-      inviteEmails: Array<{ email: string; recipientName: string; existingUserId?: string }>;
+      inviteEmails: Array<{ email: string; recipientName: string; existingUserId?: string; invitationToken: string }>;
     }>(async (transaction: Transaction) => {
       const groupId = randomUUID();
       const group = await this.groupDao.createGroup(
@@ -103,11 +110,12 @@ export class GroupService {
         transaction
       );
 
-      const inviteEmails: Array<{ email: string; recipientName: string; existingUserId?: string }> = [];
+      const inviteEmails: Array<{ email: string; recipientName: string; existingUserId?: string; invitationToken: string }> = [];
       const members = input.members ?? [];
       for (const inv of members) {
         const email = inv.email.toLowerCase().trim();
         const existingUser = await this.userDao.findByEmail(email);
+        const invitationToken = this.generateInvitationToken();
 
         if (existingUser) {
           const activeGroupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(existingUser.id, transaction);
@@ -118,8 +126,8 @@ export class GroupService {
           if (existingMember) {
             throw new HttpError(400, "This person is already a member or has been invited to this group");
           }
-          await this.groupMemberDao.findOrCreateInvitedMember(group.id, existingUser.id, transaction);
-          inviteEmails.push({ email, recipientName: existingUser.fullName, existingUserId: existingUser.id });
+          await this.groupMemberDao.findOrCreateInvitedMember(group.id, existingUser.id, transaction, invitationToken);
+          inviteEmails.push({ email, recipientName: existingUser.fullName, existingUserId: existingUser.id, invitationToken });
         } else {
           await this.groupInviteDao.create(
             {
@@ -127,11 +135,12 @@ export class GroupService {
               email,
               fullName: inv.fullName.trim(),
               phone: inv.phone?.trim() ?? null,
-              invitedBy: input.creatorId
+              invitedBy: input.creatorId,
+              invitationToken
             },
             transaction
           );
-          inviteEmails.push({ email, recipientName: inv.fullName.trim() });
+          inviteEmails.push({ email, recipientName: inv.fullName.trim(), invitationToken });
         }
       }
 
@@ -139,12 +148,15 @@ export class GroupService {
     });
 
     const inviter = await this.userDao.findById(input.creatorId);
-    for (const { email, recipientName } of result.inviteEmails) {
+    for (const { email, recipientName, invitationToken } of result.inviteEmails) {
+      const acceptUrl = baseUrl ? `${baseUrl}/member-invitation/${invitationToken}` : "#";
       this.emailService
         .sendGroupInvite(email, {
           recipientName,
           groupName: result.group.name,
-          inviterName: inviter?.fullName
+          inviterName: inviter?.fullName,
+          acceptUrl,
+          baseUrl: env.frontendUrl
         })
         .catch(() => {});
     }
@@ -174,11 +186,13 @@ export class GroupService {
     }
 
     const inviter = await this.userDao.findById(callerId);
+    const baseUrl = env.frontendUrl.replace(/\/$/, "") || "";
     return this.dbDao.withTransaction(async (transaction) => {
       const result: Array<GroupInvite | GroupMember> = [];
       for (const inv of invites) {
         const email = inv.email.toLowerCase().trim();
         const existingUser = await this.userDao.findByEmail(email);
+        const invitationToken = this.generateInvitationToken();
 
         if (existingUser) {
           const activeGroupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(existingUser.id, transaction);
@@ -192,14 +206,18 @@ export class GroupService {
           const [member] = await this.groupMemberDao.findOrCreateInvitedMember(
             groupId,
             existingUser.id,
-            transaction
+            transaction,
+            invitationToken
           );
           result.push(member);
+          const acceptUrl = baseUrl ? `${baseUrl}/member-invitation/${invitationToken}` : "#";
           this.emailService
             .sendGroupInvite(email, {
               recipientName: existingUser.fullName,
               groupName: group.name,
-              inviterName: inviter?.fullName
+              inviterName: inviter?.fullName,
+              acceptUrl,
+              baseUrl: env.frontendUrl
             })
             .catch(() => {});
           this.notificationService.notifyGroupInvite(existingUser.id, group.name).catch(() => {});
@@ -210,16 +228,20 @@ export class GroupService {
               email,
               fullName: inv.fullName.trim(),
               phone: inv.phone?.trim() ?? null,
-              invitedBy: callerId
+              invitedBy: callerId,
+              invitationToken
             },
             transaction
           );
           result.push(groupInvite);
+          const acceptUrl = baseUrl ? `${baseUrl}/member-invitation/${invitationToken}` : "#";
           this.emailService
             .sendGroupInvite(email, {
               recipientName: inv.fullName.trim(),
               groupName: group.name,
-              inviterName: inviter?.fullName
+              inviterName: inviter?.fullName,
+              acceptUrl,
+              baseUrl: env.frontendUrl
             })
             .catch(() => {});
         }

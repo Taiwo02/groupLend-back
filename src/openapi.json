@@ -104,6 +104,220 @@
         }
       }
     },
+    "/auth/profile": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current user profile",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "user": { "$ref": "#/components/schemas/User" } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "User not found" }
+        }
+      }
+    },
+    "/auth/forget-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request password reset",
+        "description": "Sends a password reset email if an account exists. Always returns the same message for security.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": { "email": { "type": "string", "format": "email" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "description": "If an account exists with this email, we sent a password reset link." }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/set-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Set new password with reset token",
+        "description": "Set a new password using the token from the forget-password email link.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "password"],
+                "properties": {
+                  "token": { "type": "string", "description": "Reset token from the email link" },
+                  "password": { "type": "string", "minLength": 8 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset. User can now sign in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid or expired reset link" }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Change password (authenticated)",
+        "description": "Change password for the current user. Requires current password.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["currentPassword", "newPassword"],
+                "properties": {
+                  "currentPassword": { "type": "string", "description": "Current password" },
+                  "newPassword": { "type": "string", "minLength": 8 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized or current password incorrect" },
+          "404": { "description": "User not found" }
+        }
+      }
+    },
+    "/auth/member-invitation/{token}": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get invitation by token",
+        "description": "Returns invitation details for the link baseUrl/member-invitation/{token}. Use to show the invite page (group name, inviter). type 'signup' = not yet registered; type 'invited' = existing user, must sign in to accept.",
+        "parameters": [{ "name": "token", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Short invitation token from the email link" }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "type": "string", "enum": ["signup", "invited"] },
+                    "groupId": { "type": "string", "format": "uuid" },
+                    "groupName": { "type": "string" },
+                    "inviterName": { "type": "string" },
+                    "email": { "type": "string", "description": "Only for type signup" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Invitation not found or expired" }
+        }
+      }
+    },
+    "/auth/member-invitation/{token}/accept": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Accept invitation",
+        "description": "Accept the group invitation. For type 'signup': send signup in body (email must match invite); account is created and verify-email is sent. For type 'invited': send Authorization header (logged-in user must be the invitee).",
+        "parameters": [{ "name": "token", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "signup": {
+                    "type": "object",
+                    "description": "Required when invitation type is signup (new user). Email must match the invited email.",
+                    "required": ["fullName", "email", "password", "monthlyIncome", "employmentStatus"],
+                    "properties": {
+                      "fullName": { "type": "string" },
+                      "email": { "type": "string", "format": "email" },
+                      "password": { "type": "string", "minLength": 8 },
+                      "phone": { "type": "string" },
+                      "location": { "type": "string" },
+                      "monthlyIncome": { "type": "number" },
+                      "employmentStatus": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Accepted", "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "user": { "type": "object", "properties": { "id": {}, "email": {}, "fullName": {} } }, "groupId": { "type": "string", "format": "uuid" } } } } } },
+          "400": { "description": "Email must match invite, or signup required, or validation error" },
+          "401": { "description": "Sign in required to accept (for type invited)" },
+          "403": { "description": "Invitation was sent to a different account" },
+          "404": { "description": "Invitation not found or expired" },
+          "409": { "description": "Email already has an account; sign in and accept from there" }
+        }
+      }
+    },
+    "/auth/member-invitation/{token}/reject": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reject invitation",
+        "parameters": [{ "name": "token", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Declined", "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" } } } } } }, "404": { "description": "Invitation not found or expired" } }
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": ["Auth"],

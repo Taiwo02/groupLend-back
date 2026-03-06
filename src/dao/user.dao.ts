@@ -90,4 +90,36 @@ export class UserDao {
     await user.update({ kycStep });
     return user;
   }
+
+  findByPasswordResetToken(token: string): Promise<User | null> {
+    const now = new Date();
+    return User.findOne({
+      where: {
+        passwordResetToken: token,
+        passwordResetTokenExpiresAt: { [Op.gt]: now }
+      }
+    });
+  }
+
+  async setPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    await User.update(
+      { passwordResetToken: token, passwordResetTokenExpiresAt: expiresAt },
+      { where: { id: userId } }
+    );
+  }
+
+  async clearPasswordResetAndSetPassword(userId: string, passwordHash: string): Promise<void> {
+    await User.update(
+      {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null
+      },
+      { where: { id: userId } }
+    );
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await User.update({ passwordHash }, { where: { id: userId } });
+  }
 }

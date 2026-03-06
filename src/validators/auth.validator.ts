@@ -27,3 +27,21 @@ export const setLoanPinSchema = z.object({
 export const verifyEmailSchema = z.object({
   token: z.string().trim().min(1, "Verification token is required")
 });
+
+export const forgetPasswordSchema = z.object({
+  email: z.email("email must be valid").trim()
+});
+
+export const setPasswordSchema = z.object({
+  token: z.string().trim().min(1, "Reset token is required"),
+  password: z.string().min(8, "password must be at least 8 characters")
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters")
+});
+
+export const acceptInvitationSchema = z.object({
+  signup: signupSchema.optional()
+});

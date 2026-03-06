@@ -7,13 +7,15 @@ import {
   loanRejectionTemplate,
   repaymentReminderTemplate,
   defaultAlertTemplate,
+  forgotPasswordTemplate,
   type WelcomeTemplateVars,
   type GroupInviteTemplateVars,
   type LoanRequestTemplateVars,
   type LoanApprovalTemplateVars,
   type LoanRejectionTemplateVars,
   type RepaymentReminderTemplateVars,
-  type DefaultAlertTemplateVars
+  type DefaultAlertTemplateVars,
+  type ForgotPasswordTemplateVars
 } from "./templates/index.js";
 import { env } from "../config/env.js";
 
@@ -75,5 +77,10 @@ export class EmailService {
   async sendDefaultAlert(to: string, vars: DefaultAlertTemplateVars): Promise<boolean> {
     const { subject, html, text } = defaultAlertTemplate(vars);
     return this.sendMail({ to, toName: vars.borrowerName, subject, html, text });
+  }
+
+  async sendForgotPassword(to: string, vars: ForgotPasswordTemplateVars): Promise<boolean> {
+    const { subject, html, text } = forgotPasswordTemplate(vars);
+    return this.sendMail({ to, toName: vars.fullName, subject, html, text });
   }
 }

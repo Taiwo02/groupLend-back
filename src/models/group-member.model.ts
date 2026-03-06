@@ -17,6 +17,7 @@ export class GroupMember extends Model<
   declare groupId: string;
   declare role: GroupMemberRole;
   declare status: GroupMemberStatus;
+  declare invitationToken: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -45,6 +46,11 @@ GroupMember.init(
       type: DataTypes.ENUM(...Object.values(GroupMemberStatus)),
       allowNull: false,
       defaultValue: GroupMemberStatus.INVITED
+    },
+    invitationToken: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

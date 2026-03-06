@@ -1,8 +1,11 @@
 import { Context } from "hono";
 import { AuthService } from "../services/auth.service.js";
 import {
+  changePasswordSchema,
+  forgetPasswordSchema,
   loginSchema,
   setLoanPinSchema,
+  setPasswordSchema,
   signupSchema,
   submitIncomeSchema,
   verifyEmailSchema
@@ -73,5 +76,40 @@ export class AuthController {
       message: "Email verified successfully. You can now sign in.",
       user: sanitizeUser(result.user)
     });
+  }
+
+  async getProfile(c: Context): Promise<Response> {
+    const user = await this.authService.getProfile(c.get("userId"));
+    return c.json({ user: sanitizeUser(user) });
+  }
+
+  async forgetPassword(c: Context): Promise<Response> {
+    const body = await readJsonBody<Record<string, unknown>>(c);
+    const payload = parseWithSchema(forgetPasswordSchema, body);
+    await this.authService.forgetPassword(payload.email);
+    return c.json({
+      message: "If an account exists with this email, we sent a password reset link."
+    });
+  }
+
+  async setPassword(c: Context): Promise<Response> {
+    const body = await readJsonBody<Record<string, unknown>>(c);
+    const payload = parseWithSchema(setPasswordSchema, body) as z.infer<typeof setPasswordSchema>;
+    const result = await this.authService.setPassword(payload.token, payload.password);
+    return c.json({
+      message: "Password has been reset. You can now sign in.",
+      user: sanitizeUser(result.user)
+    });
+  }
+
+  async changePassword(c: Context): Promise<Response> {
+    const body = await readJsonBody<Record<string, unknown>>(c);
+    const payload = parseWithSchema(changePasswordSchema, body) as z.infer<typeof changePasswordSchema>;
+    const user = await this.authService.changePassword(
+      c.get("userId"),
+      payload.currentPassword,
+      payload.newPassword
+    );
+    return c.json({ message: "Password changed successfully", user: sanitizeUser(user) });
   }
 }

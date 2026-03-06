@@ -34,7 +34,7 @@ export function createApp(): Hono {
 
   app.route("/", createDocRoutes());
 
-  app.route("/auth", createAuthRoutes(container.authController));
+  app.route("/auth", createAuthRoutes(container.authController, container.invitationController));
   app.route("/auth/kyc", createKycRoutes(container.kycController));
   app.route(
     "/dashboard",

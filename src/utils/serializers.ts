@@ -6,5 +6,7 @@ export const sanitizeUser = (user: User): Record<string, unknown> => {
   delete raw.loanPinHash;
   delete raw.emailVerificationToken;
   delete raw.emailVerificationTokenExpiresAt;
+  delete raw.passwordResetToken;
+  delete raw.passwordResetTokenExpiresAt;
   return raw;
 };

@@ -38,7 +38,8 @@ export class GroupMemberDao {
   findOrCreateInvitedMember(
     groupId: string,
     userId: string,
-    transaction: Transaction
+    transaction: Transaction,
+    invitationToken?: string | null
   ): Promise<[GroupMember, boolean]> {
     return GroupMember.findOrCreate({
       where: { groupId, userId },
@@ -46,10 +47,41 @@ export class GroupMemberDao {
         groupId,
         userId,
         role: GroupMemberRole.MEMBER,
-        status: GroupMemberStatus.INVITED
+        status: GroupMemberStatus.INVITED,
+        invitationToken: invitationToken ?? null
       },
       transaction
+    }).then(async ([member, created]) => {
+      if (!created && invitationToken != null) {
+        await member.update({ invitationToken }, { transaction });
+      }
+      return [member, created];
     });
+  }
+
+  findByInvitationToken(token: string, transaction?: Transaction): Promise<GroupMember | null> {
+    return GroupMember.findOne({
+      where: { invitationToken: token, status: GroupMemberStatus.INVITED },
+      transaction
+    });
+  }
+
+  async updateMemberStatus(
+    groupId: string,
+    userId: string,
+    status: GroupMemberStatus,
+    transaction?: Transaction
+  ): Promise<void> {
+    await GroupMember.update({ status }, { where: { groupId, userId }, transaction });
+  }
+
+  async deleteByGroupAndUser(groupId: string, userId: string, transaction?: Transaction): Promise<number> {
+    const result = await GroupMember.destroy({ where: { groupId, userId }, transaction });
+    return result;
+  }
+
+  async clearInvitationToken(token: string, transaction?: Transaction): Promise<void> {
+    await GroupMember.update({ invitationToken: null }, { where: { invitationToken: token }, transaction });
   }
 
   findActiveMemberUserIds(groupId: string): Promise<GroupMember[]> {

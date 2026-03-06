@@ -27,6 +27,8 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   declare emailVerified: boolean;
   declare emailVerificationToken: string | null;
   declare emailVerificationTokenExpiresAt: Date | null;
+  declare passwordResetToken: string | null;
+  declare passwordResetTokenExpiresAt: Date | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -112,6 +114,14 @@ User.init(
       allowNull: true
     },
     emailVerificationTokenExpiresAt: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    passwordResetToken: {
+      type: DataTypes.STRING(64),
+      allowNull: true
+    },
+    passwordResetTokenExpiresAt: {
       type: DataTypes.DATE,
       allowNull: true
     },

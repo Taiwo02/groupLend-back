@@ -4,11 +4,29 @@ export type GroupInviteTemplateVars = {
   recipientName: string;
   groupName: string;
   inviterName?: string;
+  /** Link to accept invitation: baseUrl/member-invitation/{token} */
+  acceptUrl: string;
+  baseUrl?: string;
+  year?: string;
+  projectedCreditAmount?: string;
+  unsubscribeUrl?: string;
 };
+
+function replaceAll(html: string, vars: Record<string, string>): string {
+  let out = html;
+  for (const [key, value] of Object.entries(vars)) {
+    out = out.replace(new RegExp(`{{${key}}}`, "g"), value);
+  }
+  return out;
+}
 
 export function groupInviteTemplate(vars: GroupInviteTemplateVars): { subject: string; html: string; text: string } {
   const subject = `You're invited to join "${vars.groupName}"`;
-  const inviter = vars.inviterName ? ` by ${escapeHtml(vars.inviterName)}` : "";
+  const baseUrl = (vars.baseUrl ?? "").replace(/\/$/, "") || "#";
+  const year = vars.year ?? String(new Date().getFullYear());
+  const acceptUrl = vars.acceptUrl || "#";
+  const projectedCreditAmount = vars.projectedCreditAmount ?? "—";
+  const unsubscribeUrl = vars.unsubscribeUrl ?? `${baseUrl}/settings`;
   const htmlBody = `
     <!DOCTYPE html>
 <html lang="en">
@@ -66,7 +84,7 @@ export function groupInviteTemplate(vars: GroupInviteTemplateVars): { subject: s
           <tr>
             <td style="padding: 40px 32px 24px 32px; text-align: center;">
               <h1 style="margin: 0 0 24px 0; font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1.2;">You've Been Added to a Credit Group on Enlace</h1>
-              <p style="margin: 0 0 32px 0; font-size: 18px; line-height: 1.6; color: #475569;">Hello <strong style="color: #0f172a;">{{recipientName}}</strong>, <strong style="color: #0f172a;">{{inviterName}}</strong> has added you to the group <em style="color: #13ec80;">"{{groupName}}"</em> on Enlace.</p>
+              <p style="margin: 0 0 32px 0; font-size: 18px; line-height: 1.6; color: #475569;">Hello <strong style="color: #0f172a;">{{recipientName}}</strong>, <strong style="color: #0f172a;">{{inviter}}</strong> has added you to the group <em style="color: #13ec80;">"{{groupName}}"</em> on Enlace.</p>
 
               <!-- Value proposition box -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 40px auto; max-width: 100%; background-color: rgba(19,236,128,0.08); border: 1px solid rgba(19,236,128,0.25); border-radius: 12px;">
@@ -121,6 +139,16 @@ export function groupInviteTemplate(vars: GroupInviteTemplateVars): { subject: s
 </html>
 
   `;
-  const text = `Hi ${vars.recipientName},\n\nYou have been invited to join the group "${vars.groupName}"${vars.inviterName ? ` by ${vars.inviterName}` : ""}.\n\nSign in to your account to view the invitation and accept or decline.`;
-  return { subject, html: layout(htmlBody, subject), text };
+  const filled = replaceAll(htmlBody, {
+    recipientName: escapeHtml(vars.recipientName),
+    inviter: escapeHtml(vars.inviterName ?? "Someone"),
+    groupName: escapeHtml(vars.groupName),
+    acceptUrl,
+    baseUrl,
+    year,
+    ProjectedCreditAmount: escapeHtml(projectedCreditAmount),
+    unsubscribeUrl
+  });
+  const text = `Hi ${vars.recipientName},\n\nYou have been invited to join the group "${vars.groupName}"${vars.inviterName ? ` by ${vars.inviterName}` : ""}.\n\nUse this link to accept and join: ${acceptUrl}`;
+  return { subject, html: layout(filled, subject), text };
 }

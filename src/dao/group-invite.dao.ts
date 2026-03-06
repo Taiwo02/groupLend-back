@@ -10,6 +10,7 @@ export class GroupInviteDao {
       fullName: string;
       phone: string | null;
       invitedBy: string;
+      invitationToken?: string | null;
     },
     transaction?: Transaction
   ): Promise<GroupInvite> {
@@ -17,6 +18,13 @@ export class GroupInviteDao {
       { ...payload, status: "pending" },
       { transaction: transaction ?? undefined }
     );
+  }
+
+  findByInvitationToken(token: string, transaction?: Transaction): Promise<GroupInvite | null> {
+    return GroupInvite.findOne({
+      where: { invitationToken: token, status: "pending" },
+      transaction
+    });
   }
 
   async findPendingByEmail(email: string, transaction?: Transaction): Promise<GroupInvite[]> {
@@ -36,5 +44,9 @@ export class GroupInviteDao {
       { status: "expired" },
       { where: { email: email.toLowerCase(), status: "pending", id: { [Op.ne]: exceptInviteId } }, transaction }
     );
+  }
+
+  async markExpired(id: string, transaction?: Transaction): Promise<void> {
+    await GroupInvite.update({ status: "expired" }, { where: { id }, transaction });
   }
 }

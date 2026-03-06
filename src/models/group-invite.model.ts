@@ -20,6 +20,7 @@ export class GroupInvite extends Model<
   declare phone: string | null;
   declare invitedBy: string;
   declare status: GroupInviteStatus;
+  declare invitationToken: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -40,6 +41,11 @@ GroupInvite.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: "pending"
+    },
+    invitationToken: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

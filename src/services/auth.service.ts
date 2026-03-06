@@ -140,6 +140,57 @@ export class AuthService {
     return user.monthlyIncome == null ? "INCOME_PENDING" : "ONBOARDING_COMPLETE";
   }
 
+  /** Get current user profile (requires auth). */
+  async getProfile(userId: string): Promise<User> {
+    const user = await this.userDao.findById(userId);
+    if (!user) throw new HttpError(404, "User not found");
+    return user;
+  }
+
+  /** Request password reset: sends email with reset link if account exists. Always returns same message. */
+  async forgetPassword(email: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase();
+    const user = await this.userDao.findByEmail(normalizedEmail);
+    if (!user) return;
+
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await this.userDao.setPasswordResetToken(user.id, token, expiresAt);
+
+    const baseUrl = env.frontendUrl.replace(/\/$/, "") || "#";
+    const resetUrl = baseUrl !== "#" ? `${baseUrl}/set-password?token=${token}` : "#";
+    this.emailService
+      .sendForgotPassword(user.email, {
+        fullName: user.fullName,
+        resetUrl
+      })
+      .catch(() => {});
+  }
+
+  /** Set new password using valid reset token (from forget-password email). */
+  async setPassword(token: string, newPassword: string): Promise<{ user: User }> {
+    const user = await this.userDao.findByPasswordResetToken(token);
+    if (!user) throw new HttpError(400, "Invalid or expired reset link");
+    const passwordHash = await hashValue(newPassword);
+    await this.userDao.clearPasswordResetAndSetPassword(user.id, passwordHash);
+    const updated = await this.userDao.findById(user.id);
+    if (!updated) throw new HttpError(500, "User not found after reset");
+    return { user: updated };
+  }
+
+  /** Change password for authenticated user (requires current password). */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<User> {
+    const user = await this.userDao.findById(userId);
+    if (!user) throw new HttpError(404, "User not found");
+    const valid = await compareHash(currentPassword, user.passwordHash);
+    if (!valid) throw new HttpError(401, "Current password is incorrect");
+    const passwordHash = await hashValue(newPassword);
+    await this.userDao.updatePasswordHash(userId, passwordHash);
+    const updated = await this.userDao.findById(userId);
+    if (!updated) throw new HttpError(500, "User not found after update");
+    return updated;
+  }
+
   /** Submit income (and optional employment). Recomputes individual credit limit and group pools. */
   async submitIncome(userId: string, input: SubmitIncomeInput): Promise<User> {
     const user = await this.userDao.findById(userId);

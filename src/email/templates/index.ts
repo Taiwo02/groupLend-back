@@ -5,3 +5,4 @@ export { loanApprovalTemplate, type LoanApprovalTemplateVars } from "./loan-appr
 export { loanRejectionTemplate, type LoanRejectionTemplateVars } from "./loan-rejection.js";
 export { repaymentReminderTemplate, type RepaymentReminderTemplateVars } from "./repayment-reminder.js";
 export { defaultAlertTemplate, type DefaultAlertTemplateVars } from "./default-alert.js";
+export { forgotPasswordTemplate, type ForgotPasswordTemplateVars } from "./forgot-password.js";
