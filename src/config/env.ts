@@ -15,8 +15,9 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET ?? "",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   dbLogging: parseBoolean(process.env.DB_LOGGING, false),
-  ninApiUrl: process.env.NIN_API_URL ?? "",
-  ninApiKey: process.env.NIN_API_KEY ?? "",
+  monoApiUrl: process.env.MONO_API_URL ?? "",
+  monoId: process.env.MONO_ID ?? "",
+  monoLookUpdId: process.env.MONO_ID_LOOKUP ?? "",
   // Email – Zeptomail (Zoho) only; set ZOHO_URL and ZOHO_TOKEN to enable
   zohoUrl: process.env.ZOHO_URL ?? "",
   zohoToken: process.env.ZOHO_TOKEN ?? "",
