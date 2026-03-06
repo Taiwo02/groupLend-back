@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import { Transaction } from "sequelize";
-import { GroupMember, User } from "../models/index.js";
+import { Group, GroupMember, User } from "../models/index.js";
 import { CreditStatus, KycStatus, TrustLevel } from "../models/enums.js";
 
 export class UserDao {
@@ -9,7 +9,7 @@ export class UserDao {
   }
 
   findById(id: string, transaction?: Transaction): Promise<User | null> {
-    return User.findByPk(id, { transaction });
+    return User.findOne({where: {id}, include: [{ model: GroupMember, as: "groups", include: [{ model: Group, as: "group" }]}]});
   }
 
   findByIds(ids: string[]): Promise<User[]> {
