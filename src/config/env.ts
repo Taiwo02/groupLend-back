@@ -26,7 +26,11 @@ export const env = {
   /** Comma-separated allowed origins for CORS (e.g. https://app.example.com). If unset, allows any origin (*). */
   corsOrigin: process.env.CORS_ORIGIN,
   /** Frontend base URL for email links (e.g. https://app.enlace.ng). Used in welcome and other templates. */
-  frontendUrl: process.env.FRONTEND_URL ?? ""
+  frontendUrl: process.env.FRONTEND_URL ?? "",
+  /** 32-byte key (hex or UTF-8) for BVN encryption. Required if KYC step 1 (account/BVN) is used. */
+  encryptionKey: process.env.ENCRYPTION_KEY ?? "",
+  /** Secret for NIN lookup key (HMAC). Defaults to JWT_SECRET if not set. */
+  ninLookupSecret: process.env.NIN_LOOKUP_SECRET
 };
 
 if (!env.databaseUrl) {

@@ -1,17 +1,14 @@
 import { KycStatus } from "../models/enums.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
-import { UserKycOtpDao } from "../dao/user-kyc-otp.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
 import { HttpError } from "../utils/http-error.js";
-import { lookupNin } from "./nin.client.js";
-import { sendOtpToPhone } from "./otp-sender.service.js";
-import { generateOtp, hashOtp, verifyOtp, getOtpExpiry, isOtpExpired } from "../utils/otp.js";
-import { ninFullName, ninAddress, type NinLookupData } from "../types/nin.js";
+import { encryptBvn, ninLookupKey } from "../utils/encryption.js";
+import type { NinLookupData } from "../types/nin.js";
 
-/** KYC steps: 0 = NIN+OTP, 1 = verify OTP + name, 2 = confirm address, 3 = disbursement account, 4 = employment. Step 5 = submitted. */
-export const KYC_MAX_STEP = 5;
-const LAST_DATA_STEP = 4;
+/** KYC steps: 0 = nin + fullName + address, 1 = account + BVN + code, 2 = employment. Step 3 = submitted. */
+export const KYC_MAX_STEP = 3;
+const LAST_DATA_STEP = 2;
 
 export type KycStatusResponse = {
   kycStatus: KycStatus;
@@ -24,24 +21,56 @@ export type KycStatusResponse = {
   };
 };
 
+const addressShape = {
+  addressLine1: "" as string,
+  town: "" as string,
+  lga: "" as string,
+  state: "" as string
+};
+
+const accountShape = {
+  accountNumber: "" as string,
+  bankName: "" as string,
+  bankCode: "" as string,
+  accountName: "" as string
+};
+
 export type SubmitStepPayload =
-  | { step: 0; nin: string }
-  | { step: 1; otp: string }
-  | { step: 2; address: { addressLine1: string; town: string; lga: string; state: string } }
-  | { step: 3; code: string; accountId?: string }
-  | { step: 4; employmentDetails: { employerName: string; jobTitle: string; employmentStatus: string; monthlyIncome: number } };
+  | {
+      step: 0;
+      nin: string;
+      fullName: string;
+      address: typeof addressShape;
+    }
+  | {
+      step: 1;
+      account: typeof accountShape;
+      bvn: string;
+      code: string;
+    }
+  | {
+      step: 2;
+      employmentDetails: {
+        employerName: string;
+        jobTitle: string;
+        employmentStatus: string;
+        monthlyIncome: number;
+      };
+    };
 
 export type SubmitStepResult = {
   message: string;
   kycStep: number;
-  address?: { addressLine1: string; town: string; lga: string; state: string };
 };
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, " ").trim();
+}
 
 export class KycService {
   constructor(
     private readonly userDao: UserDao,
     private readonly userKycDataDao: UserKycDataDao,
-    private readonly userKycOtpDao: UserKycOtpDao,
     private readonly statementDao: StatementDao
   ) {}
 
@@ -84,60 +113,46 @@ export class KycService {
     let result: SubmitStepResult = { message: "Saved successfully", kycStep: nextStep };
 
     if (payload.step === 0) {
-      const ninResult = await lookupNin(payload.nin);
-      if (!ninResult.ok || !ninResult.data) {
-        throw new HttpError(400, ninResult.message ?? "NIN lookup failed");
+      const kycData = await this.userKycDataDao.findByUserId(userId);
+      const ninData = kycData?.ninData as NinLookupData | null | undefined;
+      if (!ninData?.nin?.trim()) {
+        throw new HttpError(400, "NIN must be verified first. Use the NIN verification flow (lookup then verify OTP).");
       }
-      const data = ninResult.data as NinLookupData;
-      const phone = data.telephoneno?.trim();
-      if (!phone) {
-        throw new HttpError(400, "No phone number on NIN record; cannot send OTP");
+      const storedNin = String(ninData.nin).trim();
+      if (storedNin !== payload.nin.trim()) {
+        throw new HttpError(400, "NIN does not match the verified NIN on file");
       }
-      const otp = generateOtp();
-      const otpHash = await hashOtp(otp);
-      await this.userKycOtpDao.upsert(userId, {
-        ninData: data,
-        otpHash,
-        phone,
-        expiresAt: getOtpExpiry()
-      });
-      await sendOtpToPhone(phone, otp);
-      result = { message: "OTP sent to your registered number", kycStep: nextStep };
-    } else if (payload.step === 1) {
-      const otpRow = await this.userKycOtpDao.findByUserId(userId);
-      if (!otpRow) throw new HttpError(400, "No pending OTP; please start from step 0 (NIN)");
-      if (isOtpExpired(otpRow.expiresAt)) {
-        await this.userKycOtpDao.deleteByUserId(userId);
-        throw new HttpError(400, "OTP expired; please request a new one from step 0");
-      }
-      const valid = await verifyOtp(payload.otp, otpRow.otpHash);
-      if (!valid) throw new HttpError(400, "Invalid OTP");
-
-      const ninData = otpRow.ninData as NinLookupData;
-      const ninName = ninFullName(ninData);
-      const userFullName = user.fullName.trim();
-      const normalizedNin = ninName.toLowerCase().replace(/\s+/g, " ").trim();
-      const normalizedUser = userFullName.toLowerCase().replace(/\s+/g, " ").trim();
-      if (normalizedNin !== normalizedUser) {
-        throw new HttpError(400, "Name on NIN does not match your account name");
-      }
-
-      await this.userKycDataDao.upsert(userId, { ninData: ninData as unknown as Record<string, unknown> });
-      await this.userKycOtpDao.deleteByUserId(userId);
-
-      const address = ninAddress(ninData);
-      result = {
-        message: "OTP verified; please confirm your address",
-        kycStep: nextStep,
-        address
-      };
-    } else if (payload.step === 2) {
+      await this.userDao.updateFullName(userId, payload.fullName);
       await this.userKycDataDao.upsert(userId, {
-        contact: payload.address as unknown as { addressLine1: string; town: string; lga: string; state: string }
+        contact: payload.address as unknown as Record<string, unknown>
       });
-    } else if (payload.step === 3) {
-      await this.saveStatementInfo(userId, payload.code, payload.accountId ?? null);
-    } else if (payload.step === 4) {
+    } else if (payload.step === 1) {
+      const userAfter = await this.userDao.findById(userId);
+      if (!userAfter) throw new HttpError(401, "User not found");
+      const accountNameNorm = normalizeName(payload.account.accountName);
+      const fullNameNorm = normalizeName(userAfter.fullName);
+      if (accountNameNorm !== fullNameNorm) {
+        throw new HttpError(400, "Account name does not match the customer name on file");
+      }
+      const kycData = await this.userKycDataDao.findByUserId(userId);
+      const ninData = kycData?.ninData as NinLookupData | null | undefined;
+      const nin = ninData?.nin?.trim() ?? "";
+      if (!nin) {
+        throw new HttpError(400, "NIN must be verified before adding account and BVN");
+      }
+      const bvnEncrypted = encryptBvn(payload.bvn);
+      const lookupKey = ninLookupKey(nin);
+      await this.userKycDataDao.upsert(userId, {
+        bvnEncrypted,
+        ninLookupKey: lookupKey
+      });
+      await this.statementDao.createOrUpdate(userId, {
+        code: payload.code,
+        accountId: payload.account.accountNumber,
+        extraData: { account: payload.account },
+        status: true
+      });
+    } else if (payload.step === 2) {
       await this.userKycDataDao.upsert(userId, { employmentDetails: payload.employmentDetails });
     }
 
@@ -149,18 +164,6 @@ export class KycService {
     }
 
     return result;
-  }
-
-  private async saveStatementInfo(
-    userId: string,
-    code: string,
-    accountId: string | null
-  ): Promise<void> {
-    await this.statementDao.createOrUpdate(userId, {
-      code,
-      accountId: code === "skip" ? null : accountId,
-      status: true
-    });
   }
 
   async goBack(userId: string, toStep: number): Promise<{ message: string; kycStep: number }> {
@@ -182,10 +185,6 @@ export class KycService {
     }
     if (toStep < 0 || toStep > LAST_DATA_STEP) {
       throw new HttpError(400, `toStep must be between 0 and ${LAST_DATA_STEP}`);
-    }
-
-    if (toStep === 0) {
-      await this.userKycOtpDao.deleteByUserId(userId);
     }
 
     await this.userDao.updateKycStep(userId, toStep);

@@ -91,6 +91,13 @@ export class UserDao {
     return user;
   }
 
+  async updateFullName(userId: string, fullName: string): Promise<User | null> {
+    const user = await User.findByPk(userId);
+    if (!user) return null;
+    await user.update({ fullName: fullName.trim() });
+    return user;
+  }
+
   findByPasswordResetToken(token: string): Promise<User | null> {
     const now = new Date();
     return User.findOne({

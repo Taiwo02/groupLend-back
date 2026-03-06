@@ -5,6 +5,7 @@ import { getContainer } from "./container.js";
 import { env } from "./config/env.js";
 import { createAuthRoutes } from "./routes/auth.routes.js";
 import { createKycRoutes } from "./routes/kyc.routes.js";
+import { createNinRoutes } from "./routes/nin.routes.js";
 import { createDashboardRoutes } from "./routes/dashboard.routes.js";
 import { createDocRoutes } from "./routes/doc.routes.js";
 import { createGroupRoutes } from "./routes/group.routes.js";
@@ -35,6 +36,7 @@ export function createApp(): Hono {
   app.route("/", createDocRoutes());
 
   app.route("/auth", createAuthRoutes(container.authController, container.invitationController));
+  app.route("/auth/nin", createNinRoutes(container.ninController));
   app.route("/auth/kyc", createKycRoutes(container.kycController));
   app.route(
     "/dashboard",

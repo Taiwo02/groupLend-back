@@ -19,6 +19,8 @@ export class UserKycDataDao {
       employmentDetails?: EmploymentDetailsPayload | null;
       profilePicture?: string | null;
       ninData?: Record<string, unknown> | null;
+      bvnEncrypted?: string | null;
+      ninLookupKey?: string | null;
       submittedAt?: Date | null;
     },
     transaction?: Transaction
@@ -30,6 +32,8 @@ export class UserKycDataDao {
       employmentDetails: data.employmentDetails ?? existing?.employmentDetails ?? null,
       profilePicture: data.profilePicture !== undefined ? data.profilePicture : existing?.profilePicture ?? null,
       ninData: data.ninData !== undefined ? data.ninData : existing?.ninData ?? null,
+      bvnEncrypted: data.bvnEncrypted !== undefined ? data.bvnEncrypted : existing?.bvnEncrypted ?? null,
+      ninLookupKey: data.ninLookupKey !== undefined ? data.ninLookupKey : existing?.ninLookupKey ?? null,
       submittedAt: data.submittedAt !== undefined ? data.submittedAt : existing?.submittedAt ?? null
     };
     if (existing) {

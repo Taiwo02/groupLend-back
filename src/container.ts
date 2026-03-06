@@ -2,6 +2,7 @@ import { sequelize } from "./config/database.js";
 import { AuthController } from "./controllers/auth.controller.js";
 import { InvitationController } from "./controllers/invitation.controller.js";
 import { KycController } from "./controllers/kyc.controller.js";
+import { NinController } from "./controllers/nin.controller.js";
 import { DashboardController } from "./controllers/dashboard.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
 import { LoanController } from "./controllers/loan.controller.js";
@@ -23,6 +24,7 @@ import { requireOnboardingComplete as requireOnboardingCompleteFactory } from ".
 import { ApprovalService } from "./services/approval.service.js";
 import { AuthService } from "./services/auth.service.js";
 import { KycService } from "./services/kyc.service.js";
+import { NinService } from "./services/nin.service.js";
 import { CreditService } from "./services/credit.service.js";
 import { DashboardService } from "./services/dashboard.service.js";
 import { GroupService } from "./services/group.service.js";
@@ -125,7 +127,9 @@ function createContainer() {
 
   const authController = new AuthController(authService);
   const invitationController = new InvitationController(invitationService);
-  const kycService = new KycService(userDao, userKycDataDao, userKycOtpDao, statementDao);
+  const ninService = new NinService(userKycDataDao, userKycOtpDao);
+  const ninController = new NinController(ninService);
+  const kycService = new KycService(userDao, userKycDataDao, statementDao);
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
   const loanController = new LoanController(loanService, approvalService, userDao);
@@ -147,6 +151,7 @@ function createContainer() {
     emailService,
     authController,
     invitationController,
+    ninController,
     kycController,
     dashboardController,
     loanController,

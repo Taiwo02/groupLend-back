@@ -47,6 +47,8 @@ export class UserKycData extends Model<
   declare employmentDetails: EmploymentDetailsPayload | null;
   declare profilePicture: string | null;
   declare ninData: Record<string, unknown> | null;
+  declare bvnEncrypted: string | null;
+  declare ninLookupKey: string | null;
   declare submittedAt: Date | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
@@ -76,6 +78,14 @@ UserKycData.init(
     },
     ninData: {
       type: DataTypes.JSONB,
+      allowNull: true
+    },
+    bvnEncrypted: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    ninLookupKey: {
+      type: DataTypes.STRING(64),
       allowNull: true
     },
     submittedAt: {
