@@ -425,6 +425,7 @@
       "post": {
         "tags": ["Groups"],
         "summary": "Create group",
+        "description": "Creates a group with the caller as creator. Optionally include `members` to add members and send them invite emails (existing users get a group_member invite; new users get a pending group_invite until they sign up).",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -450,13 +451,26 @@
                   "gracePeriodType": { "type": "string", "maxLength": 20 },
                   "overGracePenalCharges": { "type": "number", "minimum": 0 },
                   "ageRange": { "type": "array", "items": { "type": "string" }, "example": ["18-35", "30-45"] },
-                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "PENDING"] }
+                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "PENDING"] },
+                  "members": {
+                    "type": "array",
+                    "description": "Optional list of members to add and send invite emails. Existing users are added as invited members; new users get a pending invite until signup.",
+                    "items": {
+                      "type": "object",
+                      "required": ["fullName", "email"],
+                      "properties": {
+                        "fullName": { "type": "string", "minLength": 1, "description": "Display name" },
+                        "email": { "type": "string", "format": "email" },
+                        "phone": { "type": "string", "description": "Optional phone number" }
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "401": { "description": "Unauthorized" } }
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "400": { "description": "Validation error or invitee already in a group / already invited" }, "401": { "description": "Unauthorized" } }
       }
     },
     "/groups/{id}": {
