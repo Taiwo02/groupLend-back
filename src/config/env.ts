@@ -28,6 +28,8 @@ export const env = {
   corsOrigin: process.env.CORS_ORIGIN,
   /** Frontend base URL for email links (e.g. https://app.enlace.ng). Used in welcome and other templates. */
   frontendUrl: process.env.FRONTEND_URL ?? "",
+  /** Termii API token used for sending OTP SMS. */
+  smsToken: process.env.SMS_TOKEN ?? "",
   /** 32-byte key (hex or UTF-8) for BVN encryption. Required if KYC step 1 (account/BVN) is used. */
   encryptionKey: process.env.ENCRYPTION_KEY ?? "",
   /** Secret for NIN lookup key (HMAC). Defaults to JWT_SECRET if not set. */
