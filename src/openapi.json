@@ -9,7 +9,7 @@
   "servers": [{ "url": "/", "description": "API root" }],
   "tags": [
     { "name": "Health", "description": "Health check" },
-    { "name": "Auth", "description": "Signup, verify email, login, income, PIN" },
+    { "name": "Auth", "description": "Signup, verify email, login, profile, forget-password, set-password, change-password, income, PIN" },
     { "name": "KYC", "description": "Customer KYC step-by-step flow and go-back" },
     { "name": "Dashboard", "description": "Aggregated user dashboard" },
     { "name": "Groups", "description": "Groups and members" },
