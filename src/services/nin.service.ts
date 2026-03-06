@@ -1,10 +1,10 @@
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { UserKycOtpDao } from "../dao/user-kyc-otp.dao.js";
 import { HttpError } from "../utils/http-error.js";
-import { lookupNin } from "./nin.client.js";
+import { lookupNin } from "./mono.client.js";
 import { sendOtpToPhone } from "./otp-sender.service.js";
 import { generateOtp, hashOtp, verifyOtp, getOtpExpiry, isOtpExpired } from "../utils/otp.js";
-import type { NinLookupData } from "../types/nin.js";
+import { NinLookupData } from "../types/nin.js";
 
 export type NinLookupPayload = { nin: string };
 export type NinVerifyPayload = { nin: string; otp: string };
