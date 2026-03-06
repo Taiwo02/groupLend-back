@@ -69,33 +69,10 @@
       }
     },
     "/auth/verify-email": {
-      "get": {
-        "tags": ["Auth"],
-        "summary": "Verify email (from link in welcome email)",
-        "parameters": [
-          { "name": "token", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Verification token from the welcome email link" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Email verified. User can now sign in.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": { "type": "string" },
-                    "user": { "$ref": "#/components/schemas/User" }
-                  }
-                }
-              }
-            }
-          },
-          "400": { "description": "Invalid or expired verification link" }
-        }
-      },
       "post": {
         "tags": ["Auth"],
-        "summary": "Verify email (token in body)",
+        "summary": "Verify email",
+        "description": "Verifies the user's email using the token sent in the welcome email. The frontend verify-email page (e.g. opened from the link in the email) should read the token from the URL and send it in the request body.",
         "requestBody": {
           "required": true,
           "content": {

@@ -66,14 +66,8 @@ export class AuthController {
   }
 
   async verifyEmail(c: Context): Promise<Response> {
-    const queryToken = c.req.query("token");
-    const token =
-      typeof queryToken === "string" && queryToken.length > 0
-        ? queryToken
-        : c.req.method === "POST"
-          ? (await readJsonBody<Record<string, unknown>>(c).then((b) => (b?.token as string) ?? ""))
-          : "";
-    const payload = parseWithSchema(verifyEmailSchema, { token });
+    const body = await readJsonBody<Record<string, unknown>>(c);
+    const payload = parseWithSchema(verifyEmailSchema, body);
     const result = await this.authService.verifyEmail(payload.token);
     return c.json({
       message: "Email verified successfully. You can now sign in.",
