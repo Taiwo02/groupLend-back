@@ -97,7 +97,7 @@ export async function verifyAccount(
       },
       body: JSON.stringify({
         account_number: accountNumber.trim(),
-        bank_code: bankCode.trim()
+        nip_code: bankCode.trim()
       })
     });
     const body = (await res.json()) as AccountLookupResponse;
