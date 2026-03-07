@@ -21,11 +21,11 @@ export type KycStatusResponse = {
   };
 };
 
-const addressShape = {
-  addressLine1: "" as string,
-  town: "" as string,
-  lga: "" as string,
-  state: "" as string
+export type StepZeroAddress = {
+  addressLine1: string;
+  town?: string;
+  lga?: string;
+  state?: string;
 };
 
 const accountShape = {
@@ -40,7 +40,7 @@ export type SubmitStepPayload =
       step: 0;
       nin: string;
       fullName: string;
-      address: typeof addressShape;
+      address: StepZeroAddress;
     }
   | {
       step: 1;

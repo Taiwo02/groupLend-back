@@ -6,9 +6,9 @@ export const kycStepZeroSchema = z.object({
   fullName: z.string().trim().min(1, "fullName is required"),
   address: z.object({
     addressLine1: z.string().trim().min(1, "addressLine1 is required"),
-    town: z.string().trim().min(1, "town is required"),
-    lga: z.string().trim().min(1, "lga is required"),
-    state: z.string().trim().min(1, "state is required")
+    town: z.string().trim().min(1, "town is required").optional(),
+    lga: z.string().trim().min(1, "lga is required").optional(),
+    state: z.string().trim().min(1, "state is required").optional()
   })
 });
 
