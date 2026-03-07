@@ -2,6 +2,7 @@ import { sequelize } from "./config/database.js";
 import { AuthController } from "./controllers/auth.controller.js";
 import { InvitationController } from "./controllers/invitation.controller.js";
 import { KycController } from "./controllers/kyc.controller.js";
+import { LookupController } from "./controllers/lookup.controller.js";
 import { NinController } from "./controllers/nin.controller.js";
 import { DashboardController } from "./controllers/dashboard.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
@@ -129,6 +130,7 @@ function createContainer() {
   const invitationController = new InvitationController(invitationService);
   const ninService = new NinService(userKycDataDao, userKycOtpDao);
   const ninController = new NinController(ninService);
+  const lookupController = new LookupController();
   const kycService = new KycService(userDao, userKycDataDao, statementDao);
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
@@ -152,6 +154,7 @@ function createContainer() {
     authController,
     invitationController,
     ninController,
+    lookupController,
     kycController,
     dashboardController,
     loanController,

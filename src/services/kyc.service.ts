@@ -65,8 +65,18 @@ export type SubmitStepResult = {
   kycStep: number;
 };
 
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, " ").trim();
+/** Returns true if at least 2 name parts (words) appear in both strings, in any order. */
+function atLeastTwoNamesMatch(fullName: string, accountName: string): boolean {
+  const toWords = (s: string) =>
+    s
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+  const fullSet = new Set(toWords(fullName));
+  const accountWords = toWords(accountName);
+  const matchCount = accountWords.filter((w) => fullSet.has(w)).length;
+  return matchCount >= 2;
 }
 
 export class KycService {
@@ -131,10 +141,8 @@ export class KycService {
     } else if (payload.step === 1) {
       const userAfter = await this.userDao.findById(userId);
       if (!userAfter) throw new HttpError(401, "User not found");
-      const accountNameNorm = normalizeName(payload.account.accountName);
-      const fullNameNorm = normalizeName(userAfter.fullName);
-      if (accountNameNorm !== fullNameNorm) {
-        throw new HttpError(400, "Account name does not match the customer name on file");
+      if (!atLeastTwoNamesMatch(userAfter.fullName, payload.account.accountName)) {
+        throw new HttpError(400, "Account name does not match the your full name");
       }
       const kycData = await this.userKycDataDao.findByUserId(userId);
       const ninData = kycData?.ninData as NinLookupData | null | undefined;

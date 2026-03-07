@@ -28,6 +28,10 @@
       "description": "Standalone NIN lookup and OTP verification"
     },
     {
+      "name": "Lookup",
+      "description": "Bank account lookup (verify account number and bank)"
+    },
+    {
       "name": "KYC",
       "description": "Customer KYC step-by-step flow and go-back"
     },
@@ -887,6 +891,104 @@
           "401": {
             "description": "Unauthorized"
           }
+        }
+      }
+    },
+    "/auth/lookup/banks": {
+      "get": {
+        "tags": ["Lookup"],
+        "summary": "Get list of banks",
+        "description": "Returns list of banks (Mono lookup/banks). Use nip_code or bank_code when verifying account.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Lookup successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "successful" },
+                    "message": { "type": "string", "example": "Lookup Successful" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "banks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": { "type": "string" },
+                              "bank_code": { "type": "string", "nullable": true },
+                              "nip_code": { "type": "string" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bank list lookup failed" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/auth/lookup/account": {
+      "post": {
+        "tags": ["Lookup"],
+        "summary": "Verify bank account number",
+        "description": "Looks up account name and bank details for the given account number and bank code (Mono lookup/account-number).",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accountNumber", "bankCode"],
+                "properties": {
+                  "accountNumber": { "type": "string", "description": "Bank account number" },
+                  "bankCode": { "type": "string", "description": "Bank code (e.g. 000015)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lookup successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "successful" },
+                    "message": { "type": "string", "example": "Lookup Successful" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string", "description": "Account holder name" },
+                        "account_number": { "type": "string" },
+                        "bvn": { "type": "string", "nullable": true },
+                        "bank": {
+                          "type": "object",
+                          "properties": {
+                            "name": { "type": "string" },
+                            "code": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Account lookup failed or invalid request" },
+          "401": { "description": "Unauthorized" }
         }
       }
     },
