@@ -28,6 +28,8 @@ export interface EmploymentDetailsPayload {
   jobTitle?: string;
   employmentStatus?: string;
   monthlyIncome?: number;
+  workAddress?: string;
+  workEmail?: string;
 }
 
 export interface ConfirmedAddressPayload {

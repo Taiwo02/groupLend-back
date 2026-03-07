@@ -30,7 +30,9 @@ export const kycStepTwoSchema = z.object({
     employerName: z.string().trim().min(1, "employerName is required"),
     jobTitle: z.string().trim().min(1, "jobTitle is required"),
     employmentStatus: z.string().trim().min(1, "employmentStatus is required"),
-    monthlyIncome: z.coerce.number().positive("monthlyIncome must be positive")
+    monthlyIncome: z.coerce.number().positive("monthlyIncome must be positive"),
+    workAddress: z.string().trim().optional(),
+    workEmail: z.string().trim().optional()
   })
 });
 

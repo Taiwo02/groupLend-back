@@ -55,6 +55,8 @@ export type SubmitStepPayload =
         jobTitle: string;
         employmentStatus: string;
         monthlyIncome: number;
+        workAddress?: string;
+        workEmail?: string;
       };
     };
 
