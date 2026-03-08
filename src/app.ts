@@ -40,10 +40,7 @@ export function createApp(): Hono {
   app.route("/auth/nin", createNinRoutes(container.ninController));
   app.route("/auth/lookup", createLookupRoutes(container.lookupController));
   app.route("/auth/kyc", createKycRoutes(container.kycController));
-  app.route(
-    "/dashboard",
-    createDashboardRoutes(container.dashboardController, container.requireOnboardingComplete)
-  );
+  app.route("/dashboard", createDashboardRoutes(container.dashboardController));
   app.route("/groups", createGroupRoutes(container.groupController));
   app.route(
     "/loans",
