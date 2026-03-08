@@ -34,12 +34,12 @@ export function requireOnboardingComplete(userDao: UserDao) {
     if (!hasEmploymentDetails(user.employmentStatus)) {
       throw new HttpError(403, "Complete employment details before accessing this resource");
     }
-    if (user.kycStatus !== KycStatus.APPROVED) {
-      throw new HttpError(403, "Complete KYC verification before accessing this resource");
-    }
-    if (!user.loanPinHash) {
-      throw new HttpError(403, "Set up your loan PIN before accessing this resource");
-    }
+    // if (user.kycStatus !== KycStatus.APPROVED) {
+    //   throw new HttpError(403, "Complete KYC verification before accessing this resource");
+    // }
+    // if (!user.loanPinHash) {
+    //   throw new HttpError(403, "Set up your loan PIN before accessing this resource");
+    // }
 
     await next();
   };
