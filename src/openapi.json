@@ -2187,6 +2187,10 @@
                 "GOLD"
               ]
             },
+            "pin": {
+              "type": "boolean",
+              "description": "True if the user has set a loan PIN, false otherwise"
+            },
             "createdAt": {
               "type": "string",
               "format": "date-time"
