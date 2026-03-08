@@ -5,13 +5,17 @@ import { GroupDao } from "../dao/group.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
 import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
 import { LoanDao } from "../dao/loan.dao.js";
+import { MandateDao } from "../dao/mandate.dao.js";
+import { MemberMandateDao } from "../dao/member-mandate.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { UserDao } from "../dao/user.dao.js";
-import { Loan } from "../models/index.js";
+import { Loan, Mandate } from "../models/index.js";
 import {
   ApprovalDecision,
   CredibilityLevel,
   GroupMemberStatus,
+  GroupMandateStatus,
+  KycStatus,
   LoanPurpose,
   LoanStatus,
   MandateStatus,
@@ -34,6 +38,10 @@ export type GroupLoanRequestInput = LoanRequestInput & {
   groupId: string;
 };
 
+/** 40% of annual income per member; group access amount = sum of this over members. */
+const ACCESS_INCOME_RATIO = 0.4;
+const MONTHS_PER_YEAR = 12;
+
 export class LoanService {
   constructor(
     private readonly dbDao: DbDao,
@@ -42,6 +50,8 @@ export class LoanService {
     private readonly groupMemberDao: GroupMemberDao,
     private readonly loanDao: LoanDao,
     private readonly loanApprovalDao: LoanApprovalDao,
+    private readonly mandateDao: MandateDao,
+    private readonly memberMandateDao: MemberMandateDao,
     private readonly repaymentDao: RepaymentDao,
     private readonly directDebitMandateDao: DirectDebitMandateDao,
     private readonly notificationService: NotificationService,
@@ -92,24 +102,55 @@ export class LoanService {
     const activeMembers = await this.groupMemberDao.findActiveMembersByGroupId(input.groupId);
     if (!activeMembers.length) throw new HttpError(400, "No active group members");
 
+    const memberUserIds = activeMembers.map((m) => m.userId);
+    const membersWithKyc = await this.userDao.findByIdsWithKyc(memberUserIds);
+    const notApproved = membersWithKyc.filter((u) => u.kycStatus !== KycStatus.APPROVED);
+    if (notApproved.length > 0) {
+      const names = notApproved.map((u) => u.fullName).join(", ");
+      throw new HttpError(
+        400,
+        `All group members must complete KYC before any loan can be requested. Pending: ${names}`
+      );
+    }
+
     const currentPool = toNumber(group.currentCreditPool);
     const isInstitutional =
       group.credibilityLevel === CredibilityLevel.VERIFIED_TRUST_GROUP && input.amount > currentPool;
 
-    if (!isInstitutional && input.amount > currentPool) {
-      throw new HttpError(400, "Amount exceeds group credit pool");
-    }
-
-    const initialStatus = isInstitutional
-      ? LoanStatus.INSTITUTIONAL_PENDING
-      : LoanStatus.PENDING_APPROVAL;
-
     return this.dbDao.withTransaction(async (transaction) => {
+      const currentYear = new Date().getFullYear();
+      let mandate = await this.mandateDao.findActiveByGroupAndYear(
+        input.groupId,
+        currentYear,
+        transaction
+      );
+      if (!mandate) {
+        mandate = await this.ensureMandateForGroup(input.groupId, currentYear, transaction);
+      }
+
+      const totalAccessAmount = toNumber(mandate.totalAccessAmount);
+      const usedAmount = await this.loanDao.sumDisbursedAmountByMandateId(mandate.id, transaction);
+      const maxAmount = totalAccessAmount - usedAmount;
+      if (input.amount > maxAmount) {
+        throw new HttpError(400, "Amount exceeds group access amount for this year", {
+          maxAmount: Number(maxAmount.toFixed(2))
+        });
+      }
+
+      if (!isInstitutional && input.amount > currentPool) {
+        throw new HttpError(400, "Amount exceeds group credit pool");
+      }
+
+      const initialStatus = isInstitutional
+        ? LoanStatus.INSTITUTIONAL_PENDING
+        : LoanStatus.PENDING_APPROVAL;
+
       const totalPayable = this.computeTotalPayable(input.amount, input.interestRate, input.tenorMonths);
       const loan = await this.loanDao.createLoan(
         {
           borrowerId: input.borrowerId,
           groupId: input.groupId,
+          mandateId: mandate.id,
           amount: input.amount,
           interestRate: input.interestRate,
           tenorMonths: input.tenorMonths,
@@ -156,6 +197,47 @@ export class LoanService {
 
       return loan;
     });
+  }
+
+  /**
+   * Get or create the active mandate for the group for the given year.
+   * Group access amount = sum of 40% of each member's annual income.
+   */
+  private async ensureMandateForGroup(
+    groupId: string,
+    year: number,
+    transaction: Transaction
+  ): Promise<Mandate> {
+    const activeMembers = await this.groupMemberDao.findActiveMembersByGroupId(groupId, transaction);
+    const userIds = activeMembers.map((m) => m.userId);
+    const users = await this.userDao.findByIdsWithKyc(userIds, transaction);
+    let totalAccessAmount = 0;
+    for (const u of users) {
+      const income = toNumber(u.monthlyIncome ?? 0);
+      totalAccessAmount += ACCESS_INCOME_RATIO * MONTHS_PER_YEAR * income;
+    }
+    totalAccessAmount = Number(totalAccessAmount.toFixed(2));
+
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31);
+    const mandate = await this.mandateDao.create(
+      {
+        groupId,
+        year,
+        totalAccessAmount,
+        startDate,
+        endDate,
+        status: GroupMandateStatus.ACTIVE
+      },
+      transaction
+    );
+    for (const member of activeMembers) {
+      await this.memberMandateDao.create(
+        { mandateId: mandate.id, userId: member.userId },
+        transaction
+      );
+    }
+    return mandate;
   }
 
   /** Mock: push to partner lender queue. In production would call external service. */

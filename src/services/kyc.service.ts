@@ -5,6 +5,7 @@ import { StatementDao } from "../dao/statement.dao.js";
 import { HttpError } from "../utils/http-error.js";
 import { encryptBvn, ninLookupKey } from "../utils/encryption.js";
 import type { NinLookupData } from "../types/nin.js";
+import type { StatementSyncService } from "./statement-sync.service.js";
 
 /** KYC steps: 0 = nin + fullName + address, 1 = account + BVN + code, 2 = employment. Step 3 = submitted. */
 export const KYC_MAX_STEP = 3;
@@ -83,7 +84,8 @@ export class KycService {
   constructor(
     private readonly userDao: UserDao,
     private readonly userKycDataDao: UserKycDataDao,
-    private readonly statementDao: StatementDao
+    private readonly statementDao: StatementDao,
+    private readonly statementSyncService: StatementSyncService
   ) {}
 
   async getStatus(userId: string): Promise<KycStatusResponse> {
@@ -162,17 +164,17 @@ export class KycService {
         extraData: { account: payload.account },
         status: true
       });
+      await this.statementSyncService.saveStatementInfo(userId, payload.code, payload.code);
     } else if (payload.step === 2) {
       await this.userKycDataDao.upsert(userId, { employmentDetails: payload.employmentDetails });
+      await this.userDao.updateKycStatus(userId, KycStatus.SUBMITTED);
+
     }
-
     await this.userDao.updateKycStep(userId, nextStep);
-
     if (nextStep === KYC_MAX_STEP) {
       await this.userKycDataDao.upsert(userId, { submittedAt: new Date() });
       result.message = "KYC submitted successfully; we will get back to you soon";
     }
-
     return result;
   }
 

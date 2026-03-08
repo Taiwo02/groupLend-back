@@ -1,9 +1,12 @@
+import { Account } from "./account.model.js";
 import { DirectDebitMandate } from "./direct-debit-mandate.model.js";
 import { Group } from "./group.model.js";
 import { GroupInvite } from "./group-invite.model.js";
 import { GroupMember } from "./group-member.model.js";
 import { LoanApproval } from "./loan-approval.model.js";
 import { Loan } from "./loan.model.js";
+import { Mandate } from "./mandate.model.js";
+import { MemberMandate } from "./member-mandate.model.js";
 import { Notification } from "./notification.model.js";
 import { Repayment } from "./repayment.model.js";
 import { Statement } from "./statement.model.js";
@@ -32,6 +35,19 @@ export const initModelAssociations = (): void => {
   Group.hasMany(Loan, { foreignKey: "groupId", as: "loans" });
   Loan.belongsTo(Group, { foreignKey: "groupId", as: "group" });
 
+  Mandate.belongsTo(Group, { foreignKey: "groupId", as: "group" });
+  Group.hasMany(Mandate, { foreignKey: "groupId", as: "mandates" });
+  Mandate.hasMany(MemberMandate, { foreignKey: "mandateId", as: "memberMandates" });
+  MemberMandate.belongsTo(Mandate, { foreignKey: "mandateId", as: "mandate" });
+  MemberMandate.belongsTo(User, { foreignKey: "userId", as: "user" });
+  User.hasMany(MemberMandate, { foreignKey: "userId", as: "memberMandates" });
+  Mandate.hasMany(Account, { foreignKey: "mandateId", as: "accounts" });
+  Account.belongsTo(Mandate, { foreignKey: "mandateId", as: "mandate" });
+  MemberMandate.hasMany(Account, { foreignKey: "memberMandateId", as: "accounts" });
+  Account.belongsTo(MemberMandate, { foreignKey: "memberMandateId", as: "memberMandate" });
+  Loan.belongsTo(Mandate, { foreignKey: "mandateId", as: "mandate" });
+  Mandate.hasMany(Loan, { foreignKey: "mandateId", as: "loans" });
+
   Loan.hasMany(LoanApproval, { foreignKey: "loanId", as: "approvals" });
   LoanApproval.belongsTo(Loan, { foreignKey: "loanId", as: "loan" });
   LoanApproval.belongsTo(User, { foreignKey: "approverId", as: "approver" });
@@ -47,6 +63,7 @@ export const initModelAssociations = (): void => {
 };
 
 export {
+  Account,
   User,
   UserKycData,
   UserKycOtp,
@@ -56,6 +73,8 @@ export {
   GroupMember,
   Loan,
   LoanApproval,
+  Mandate,
+  MemberMandate,
   Repayment,
   DirectDebitMandate,
   Notification

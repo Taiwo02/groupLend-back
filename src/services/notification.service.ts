@@ -86,4 +86,17 @@ export class NotificationService {
       }
     }
   }
+
+  /** Notify the member who was debited that the debit was for a defaulter. */
+  async notifyRecoveryDebit(
+    debitedUserId: string,
+    amount: number,
+    defaulterName: string
+  ): Promise<void> {
+    await this.notify(
+      debitedUserId,
+      NotificationType.DEFAULT_RECOVERY_DEBIT,
+      `A debit of ${amount} was applied to your account to cover the default of ${defaulterName}.`
+    );
+  }
 }

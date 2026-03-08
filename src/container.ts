@@ -15,6 +15,9 @@ import { GroupMemberDao } from "./dao/group-member.dao.js";
 import { GroupDao } from "./dao/group.dao.js";
 import { LoanApprovalDao } from "./dao/loan-approval.dao.js";
 import { LoanDao } from "./dao/loan.dao.js";
+import { MandateDao } from "./dao/mandate.dao.js";
+import { MemberMandateDao } from "./dao/member-mandate.dao.js";
+import { AccountDao } from "./dao/account.dao.js";
 import { NotificationDao } from "./dao/notification.dao.js";
 import { RepaymentDao } from "./dao/repayment.dao.js";
 import { StatementDao } from "./dao/statement.dao.js";
@@ -26,6 +29,7 @@ import { ApprovalService } from "./services/approval.service.js";
 import { AuthService } from "./services/auth.service.js";
 import { KycService } from "./services/kyc.service.js";
 import { NinService } from "./services/nin.service.js";
+import { StatementSyncService } from "./services/statement-sync.service.js";
 import { CreditService } from "./services/credit.service.js";
 import { DashboardService } from "./services/dashboard.service.js";
 import { GroupService } from "./services/group.service.js";
@@ -52,6 +56,9 @@ function createContainer() {
   const repaymentDao = new RepaymentDao();
   const notificationDao = new NotificationDao();
   const directDebitMandateDao = new DirectDebitMandateDao();
+  const mandateDao = new MandateDao();
+  const memberMandateDao = new MemberMandateDao();
+  const accountDao = new AccountDao();
 
   const creditService = new CreditService(groupMemberDao, userDao);
   const trustService = new TrustService(userDao, groupDao);
@@ -72,6 +79,8 @@ function createContainer() {
     groupMemberDao,
     loanDao,
     loanApprovalDao,
+    mandateDao,
+    memberMandateDao,
     repaymentDao,
     directDebitMandateDao,
     notificationService,
@@ -131,7 +140,8 @@ function createContainer() {
   const ninService = new NinService(userKycDataDao, userKycOtpDao);
   const ninController = new NinController(ninService);
   const lookupController = new LookupController();
-  const kycService = new KycService(userDao, userKycDataDao, statementDao);
+  const statementSyncService = new StatementSyncService(userDao, userKycDataDao, statementDao);
+  const kycService = new KycService(userDao, userKycDataDao, statementDao, statementSyncService);
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
   const loanController = new LoanController(loanService, approvalService, userDao);
@@ -145,6 +155,9 @@ function createContainer() {
     loanDao,
     groupMemberDao,
     userDao,
+    accountDao,
+    memberMandateDao,
+    notificationService,
     emailService
   );
 
@@ -162,6 +175,9 @@ function createContainer() {
     repaymentController,
     requireOnboardingComplete,
     directDebitMandateDao,
+    mandateDao,
+    memberMandateDao,
+    accountDao,
     runQuarterlyGroupReview: () => quarterlyService.runQuarterlyGroupReview(),
     defaultService
   };

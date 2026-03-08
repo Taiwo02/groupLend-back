@@ -142,3 +142,80 @@ export async function getBankList(): Promise<BankListResult> {
     return { ok: false, message };
   }
 }
+
+const monoHeaders = (): Record<string, string> =>
+  env.monoLookUpdId ? { accept: "application/json", "mono-sec-key": env.monoLookUpdId } : {};
+
+/** Fetch identities for a linked Mono account. */
+export async function getIdentities(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/identity`;
+    const res = await fetch(url, { method: "GET", headers: monoHeaders() });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) return { ok: false, message: (data.message as string) ?? "Identities fetch failed" };
+    return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Identities request failed" };
+  }
+}
+
+/** Update customer on Mono (identity, address, phone). */
+export async function updateCustomer(
+  accountId: string,
+  payload: { identity?: { type: string; number: string }; address?: unknown; phone?: string }
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/customer`;
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...monoHeaders() },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const body = (await res.json()) as Record<string, unknown>;
+      return { ok: false, message: (body.message as string) ?? "Update customer failed" };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Update customer failed" };
+  }
+}
+
+/** Fetch income for a linked Mono account. */
+export async function getIncome(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/income`;
+    const res = await fetch(url, { method: "GET", headers: monoHeaders() });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) return { ok: false, message: (data.message as string) ?? "Income fetch failed" };
+    return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Income request failed" };
+  }
+}
+
+/** Fetch statement for a linked Mono account. */
+export async function getStatement(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/statement`;
+    const res = await fetch(url, { method: "GET", headers: monoHeaders() });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) return { ok: false, message: (data.message as string) ?? "Statement fetch failed" };
+    return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Statement request failed" };
+  }
+}
+
+/** Fetch details for a linked Mono account. */
+export async function getDetails(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}`;
+    const res = await fetch(url, { method: "GET", headers: monoHeaders() });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) return { ok: false, message: (data.message as string) ?? "Details fetch failed" };
+    return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Details request failed" };
+  }
+}

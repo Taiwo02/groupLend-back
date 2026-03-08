@@ -1,7 +1,8 @@
 export enum KycStatus {
   PENDING = "PENDING",
   APPROVED = "APPROVED",
-  REJECTED = "REJECTED"
+  REJECTED = "REJECTED",
+  SUBMITTED = "SUBMITTED"
 }
 
 export enum CreditStatus {
@@ -42,6 +43,18 @@ export enum ApprovalDecision {
 export enum MandateStatus {
   ACTIVE = "ACTIVE",
   FAILED = "FAILED"
+}
+
+/** Group-level mandate (yearly); status of the mandate period. */
+export enum GroupMandateStatus {
+  ACTIVE = "ACTIVE",
+  EXPIRED = "EXPIRED"
+}
+
+export enum AccountStatus {
+  INACTIVE = "inactive",
+  ACTIVE = "active",
+  CANCELED = "canceled"
 }
 
 export enum RepaymentStatus {
@@ -94,5 +107,7 @@ export enum NotificationType {
   LOAN_APPROVAL = "LOAN_APPROVAL",
   LOAN_REJECTION = "LOAN_REJECTION",
   REPAYMENT_REMINDER = "REPAYMENT_REMINDER",
-  DEFAULT_ALERT = "DEFAULT_ALERT"
+  DEFAULT_ALERT = "DEFAULT_ALERT",
+  /** Notify member who was debited for default recovery (debit was for defaulter X). */
+  DEFAULT_RECOVERY_DEBIT = "DEFAULT_RECOVERY_DEBIT"
 }

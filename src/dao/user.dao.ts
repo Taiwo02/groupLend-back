@@ -16,6 +16,15 @@ export class UserDao {
     return User.findAll({ where: { id: ids }, attributes: ["id", "monthlyIncome"] });
   }
 
+  /** For KYC checks: returns id, kycStatus, fullName for the given user ids. */
+  findByIdsWithKyc(ids: string[], transaction?: Transaction): Promise<User[]> {
+    return User.findAll({
+      where: { id: ids },
+      attributes: ["id", "kycStatus", "fullName", "monthlyIncome"],
+      transaction
+    });
+  }
+
   createUser(payload: {
     fullName: string;
     email: string;
@@ -89,6 +98,10 @@ export class UserDao {
     if (!user) return null;
     await user.update({ kycStep });
     return user;
+  }
+
+  async updateKycStatus(userId: string, kycStatus: KycStatus): Promise<void> {
+    await User.update({ kycStatus }, { where: { id: userId } });
   }
 
   async updateFullName(userId: string, fullName: string): Promise<User | null> {
