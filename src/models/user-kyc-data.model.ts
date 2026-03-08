@@ -30,6 +30,8 @@ export interface EmploymentDetailsPayload {
   monthlyIncome?: number;
   workAddress?: string;
   workEmail?: string;
+  /** Optional meter number (e.g. utility meter). */
+  meterNumber?: string;
 }
 
 export interface ConfirmedAddressPayload {

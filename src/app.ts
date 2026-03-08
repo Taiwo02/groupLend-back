@@ -8,6 +8,7 @@ import { createKycRoutes } from "./routes/kyc.routes.js";
 import { createLookupRoutes } from "./routes/lookup.routes.js";
 import { createNinRoutes } from "./routes/nin.routes.js";
 import { createDashboardRoutes } from "./routes/dashboard.routes.js";
+import { createAdminRoutes } from "./routes/admin.routes.js";
 import { createDocRoutes } from "./routes/doc.routes.js";
 import { createGroupRoutes } from "./routes/group.routes.js";
 import { createLoanRoutes } from "./routes/loan.routes.js";
@@ -41,6 +42,7 @@ export function createApp(): Hono {
   app.route("/auth/lookup", createLookupRoutes(container.lookupController));
   app.route("/auth/kyc", createKycRoutes(container.kycController));
   app.route("/dashboard", createDashboardRoutes(container.dashboardController));
+  app.route("/admin", createAdminRoutes(container.adminDashboardController));
   app.route("/groups", createGroupRoutes(container.groupController));
   app.route(
     "/loans",

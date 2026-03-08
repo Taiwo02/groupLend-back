@@ -1,6 +1,7 @@
 import { KycStatus } from "../models/enums.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
+import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
 import { HttpError } from "../utils/http-error.js";
 import { encryptBvn, ninLookupKey } from "../utils/encryption.js";
@@ -58,6 +59,7 @@ export type SubmitStepPayload =
         monthlyIncome: number;
         workAddress?: string;
         workEmail?: string;
+        meterNumber?: string;
       };
     };
 
@@ -84,6 +86,7 @@ export class KycService {
   constructor(
     private readonly userDao: UserDao,
     private readonly userKycDataDao: UserKycDataDao,
+    private readonly kycVerificationDao: KycVerificationDao,
     private readonly statementDao: StatementDao,
     private readonly statementSyncService: StatementSyncService
   ) {}
@@ -173,6 +176,7 @@ export class KycService {
     await this.userDao.updateKycStep(userId, nextStep);
     if (nextStep === KYC_MAX_STEP) {
       await this.userKycDataDao.upsert(userId, { submittedAt: new Date() });
+      await this.kycVerificationDao.upsert(userId, { overallStatus: "PENDING" });
       result.message = "KYC submitted successfully; we will get back to you soon";
     }
     return result;

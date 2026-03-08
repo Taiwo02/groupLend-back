@@ -25,6 +25,14 @@ export class UserDao {
     });
   }
 
+  /** Count users with KYC submitted (pending admin verification). */
+  async countPendingKyc(transaction?: Transaction): Promise<number> {
+    return User.count({
+      where: { kycStatus: KycStatus.SUBMITTED },
+      transaction
+    });
+  }
+
   createUser(payload: {
     fullName: string;
     email: string;

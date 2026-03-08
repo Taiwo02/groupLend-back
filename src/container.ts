@@ -5,6 +5,7 @@ import { KycController } from "./controllers/kyc.controller.js";
 import { LookupController } from "./controllers/lookup.controller.js";
 import { NinController } from "./controllers/nin.controller.js";
 import { DashboardController } from "./controllers/dashboard.controller.js";
+import { AdminDashboardController } from "./controllers/admin-dashboard.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
 import { LoanController } from "./controllers/loan.controller.js";
 import { RepaymentController } from "./controllers/repayment.controller.js";
@@ -24,6 +25,7 @@ import { StatementDao } from "./dao/statement.dao.js";
 import { UserDao } from "./dao/user.dao.js";
 import { UserKycDataDao } from "./dao/user-kyc-data.dao.js";
 import { UserKycOtpDao } from "./dao/user-kyc-otp.dao.js";
+import { KycVerificationDao } from "./dao/kyc-verification.dao.js";
 import { requireOnboardingComplete as requireOnboardingCompleteFactory } from "./middlewares/onboarding.middleware.js";
 import { ApprovalService } from "./services/approval.service.js";
 import { AuthService } from "./services/auth.service.js";
@@ -32,6 +34,7 @@ import { NinService } from "./services/nin.service.js";
 import { StatementSyncService } from "./services/statement-sync.service.js";
 import { CreditService } from "./services/credit.service.js";
 import { DashboardService } from "./services/dashboard.service.js";
+import { AdminDashboardService } from "./services/admin-dashboard.service.js";
 import { GroupService } from "./services/group.service.js";
 import { InvitationService } from "./services/invitation.service.js";
 import { NotificationService } from "./services/notification.service.js";
@@ -47,6 +50,7 @@ function createContainer() {
   const userDao = new UserDao();
   const userKycDataDao = new UserKycDataDao();
   const userKycOtpDao = new UserKycOtpDao();
+  const kycVerificationDao = new KycVerificationDao();
   const statementDao = new StatementDao();
   const groupDao = new GroupDao();
   const groupMemberDao = new GroupMemberDao();
@@ -134,6 +138,7 @@ function createContainer() {
     repaymentDao,
     notificationDao
   );
+  const adminDashboardService = new AdminDashboardService(loanDao, userDao, repaymentDao);
 
   const authController = new AuthController(authService);
   const invitationController = new InvitationController(invitationService);
@@ -141,9 +146,10 @@ function createContainer() {
   const ninController = new NinController(ninService);
   const lookupController = new LookupController();
   const statementSyncService = new StatementSyncService(userDao, userKycDataDao, statementDao);
-  const kycService = new KycService(userDao, userKycDataDao, statementDao, statementSyncService);
+  const kycService = new KycService(userDao, userKycDataDao, kycVerificationDao, statementDao, statementSyncService);
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
+  const adminDashboardController = new AdminDashboardController(adminDashboardService);
   const loanController = new LoanController(loanService, approvalService, userDao);
   const groupController = new GroupController(groupService);
   const repaymentController = new RepaymentController(repaymentService);
@@ -170,6 +176,7 @@ function createContainer() {
     lookupController,
     kycController,
     dashboardController,
+    adminDashboardController,
     loanController,
     groupController,
     repaymentController,
