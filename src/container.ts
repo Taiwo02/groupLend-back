@@ -6,6 +6,7 @@ import { LookupController } from "./controllers/lookup.controller.js";
 import { NinController } from "./controllers/nin.controller.js";
 import { DashboardController } from "./controllers/dashboard.controller.js";
 import { AdminDashboardController } from "./controllers/admin-dashboard.controller.js";
+import { AdminKycController } from "./controllers/admin-kyc.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
 import { LoanController } from "./controllers/loan.controller.js";
 import { RepaymentController } from "./controllers/repayment.controller.js";
@@ -35,6 +36,7 @@ import { StatementSyncService } from "./services/statement-sync.service.js";
 import { CreditService } from "./services/credit.service.js";
 import { DashboardService } from "./services/dashboard.service.js";
 import { AdminDashboardService } from "./services/admin-dashboard.service.js";
+import { AdminKycService } from "./services/admin-kyc.service.js";
 import { GroupService } from "./services/group.service.js";
 import { InvitationService } from "./services/invitation.service.js";
 import { NotificationService } from "./services/notification.service.js";
@@ -139,6 +141,7 @@ function createContainer() {
     notificationDao
   );
   const adminDashboardService = new AdminDashboardService(loanDao, userDao, repaymentDao);
+  const adminKycService = new AdminKycService(userDao, kycVerificationDao);
 
   const authController = new AuthController(authService);
   const invitationController = new InvitationController(invitationService);
@@ -150,6 +153,7 @@ function createContainer() {
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
   const adminDashboardController = new AdminDashboardController(adminDashboardService);
+  const adminKycController = new AdminKycController(adminKycService);
   const loanController = new LoanController(loanService, approvalService, userDao);
   const groupController = new GroupController(groupService);
   const repaymentController = new RepaymentController(repaymentService);
@@ -177,6 +181,7 @@ function createContainer() {
     kycController,
     dashboardController,
     adminDashboardController,
+    adminKycController,
     loanController,
     groupController,
     repaymentController,

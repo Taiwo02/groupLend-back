@@ -20,6 +20,8 @@ export class KycVerification extends Model<
   declare addressApproved: boolean;
   declare creditHistoryApproved: boolean;
   declare overallStatus: KycVerificationStatus;
+  /** Admin comment for the user (e.g. what to update). */
+  declare comment: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -60,6 +62,10 @@ KycVerification.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: "PENDING"
+    },
+    comment: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

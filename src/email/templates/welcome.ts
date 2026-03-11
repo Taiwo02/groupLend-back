@@ -43,7 +43,7 @@ const WELCOME_HTML = `<!DOCTYPE html>
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 12px;">
-                          <img src="{{baseUrl}}/logo-email.png" alt="Enlace" width="32" height="32" style="display: block; width: 32px; height: 32px;" />
+                          <img src="{baseUrl}}/logo-email.png" alt="Enlace" width="32" height="32" style="display: block; width: 32px; height: 32px;" />
                         </td>
                         <td style="vertical-align: middle;">
                           <span style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.025em;">Enlace</span>

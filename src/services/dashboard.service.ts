@@ -61,6 +61,14 @@ export type RecentActivityItem = {
   category?: "system" | "financial" | "member";
 };
 
+export type NonAcceptedMembership = {
+  userId: string;
+  fullName: string;
+  email: string;
+  status: "INVITED";
+  invitedAt: string | null;
+};
+
 export type BadgeProgress = {
   current: number;
   target: number;
@@ -93,6 +101,12 @@ export type DashboardData = {
   groupPoolStatus: Array<{ groupId: string; groupName: string; currentPool: number }>;
   credibilityScore: number | null;
   creditEligibility: number;
+  /** Deadline (e.g. group quarterly end); null if not set. */
+  deadline: string | null;
+  /** Projected amount (group target credit / goal). */
+  projectedAmount: number;
+  /** Members who have not yet accepted the group invite. */
+  nonAcceptedMemberships: NonAcceptedMembership[];
 };
 
 function memberIdDisplay(userId: string): string {
@@ -106,7 +120,11 @@ function getRevenueStatus(user: User): RevenueStatus {
 
 function getKycCompleteStatus(user: User): KycCompleteStatus {
   if (user.kycStatus === KycStatus.APPROVED) return "done";
-  if (user.kycStatus === KycStatus.PENDING && user.kycStep > 0) return "processing";
+  if (
+    [KycStatus.PENDING, KycStatus.SUBMITTED, KycStatus.RESUBMITTED, KycStatus.FLAGGED].includes(user.kycStatus) &&
+    user.kycStep > 0
+  )
+    return "processing";
   return "pending";
 }
 
@@ -145,20 +163,26 @@ export class DashboardService {
     if (!user) throw new HttpError(404, "User not found");
 
     const groupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId);
-    const [groupPoolStatus, groupOnboarding, activeLoans, pendingApprovalsCount, pendingPeerApprovals, recentActivity] = await Promise.all([
-      this.getGroupPoolStatus(userId),
-      groupIds.length > 0 ? this.getGroupOnboarding(groupIds[0], userId) : Promise.resolve(null),
-      this.getActiveLoansCount(userId),
-      this.getPendingApprovalsCount(userId),
-      this.getPendingPeerApprovals(userId),
-      this.getRecentActivity(userId)
-    ]);
+    const [groupPoolStatus, groupOnboarding, activeLoans, pendingApprovalsCount, pendingPeerApprovals, recentActivity, nonAcceptedMemberships] =
+      await Promise.all([
+        this.getGroupPoolStatus(userId),
+        groupIds.length > 0 ? this.getGroupOnboarding(groupIds[0], userId) : Promise.resolve(null),
+        this.getActiveLoansCount(userId),
+        this.getPendingApprovalsCount(userId),
+        this.getPendingPeerApprovals(userId),
+        this.getRecentActivity(userId),
+        groupIds.length > 0 ? this.getNonAcceptedMemberships(groupIds[0]) : Promise.resolve([])
+      ]);
 
     const allKycComplete = groupOnboarding ? groupOnboarding.creditStatus === "unlocked" : groupPoolStatus.length === 0;
     const view = allKycComplete ? "full" : "onboarding";
     const firstGroup = groupIds.length > 0 ? await this.groupDao.findById(groupIds[0]) : null;
     const availableCreditPool = firstGroup ? toNumber(firstGroup.currentCreditPool) : 0;
     const projectedGroupLimit = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
+    const deadline = firstGroup?.quarterlyEndDate
+      ? new Date(firstGroup.quarterlyEndDate).toISOString()
+      : null;
+    const projectedAmount = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
     const creditPoolUtilizationPercent = projectedGroupLimit > 0 ? Math.round((availableCreditPool / projectedGroupLimit) * 100) : 0;
     const credibilityScore = groupPoolStatus.length > 0 ? await this.getMaxGroupCredibility(userId) : null;
     const creditEligibility = toNumber(user.creditLimit);
@@ -189,8 +213,29 @@ export class DashboardService {
       earnBonusPoints: { description: "Invite a trusted peer to join and boost your Badge of Honor score.", invitePoints: 50 },
       groupPoolStatus,
       credibilityScore,
-      creditEligibility
+      creditEligibility,
+      deadline,
+      projectedAmount,
+      nonAcceptedMemberships
     };
+  }
+
+  private async getNonAcceptedMemberships(groupId: string): Promise<NonAcceptedMembership[]> {
+    const invited = await this.groupMemberDao.findInvitedMembersByGroupId(groupId);
+    if (invited.length === 0) return [];
+    const userIds = invited.map((m) => m.userId);
+    const users = await Promise.all(userIds.map((id) => this.userDao.findById(id)));
+    const userMap = new Map(userIds.map((id, i) => [id, users[i]]));
+    return invited.map((m) => {
+      const u = userMap.get(m.userId);
+      return {
+        userId: m.userId,
+        fullName: u?.fullName ?? "Unknown",
+        email: u?.email ?? "",
+        status: "INVITED" as const,
+        invitedAt: m.createdAt ? m.createdAt.toISOString() : null
+      };
+    });
   }
 
   private trustLevelToBadge(level: string): string {

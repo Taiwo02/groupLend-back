@@ -33,6 +33,64 @@ export class UserDao {
     });
   }
 
+  /** Statuses that appear in admin KYC queue (pending review). */
+  static readonly ADMIN_KYC_STATUSES: KycStatus[] = [
+    KycStatus.PENDING,
+    KycStatus.SUBMITTED,
+    KycStatus.RESUBMITTED
+  ];
+
+  /** Count users with KYC status in PENDING, SUBMITTED, RESUBMITTED. Optionally filter by single status or search. */
+  async countForAdminKyc(
+    opts: { status?: KycStatus; search?: string } = {},
+    transaction?: Transaction
+  ): Promise<number> {
+    const statusFilter = opts.status ? opts.status : { [Op.in]: UserDao.ADMIN_KYC_STATUSES };
+    const where = opts.search?.trim()
+      ? {
+          [Op.and]: [
+            { kycStatus: statusFilter },
+            {
+              [Op.or]: [
+                { fullName: { [Op.iLike]: `%${opts.search!.trim()}%` } },
+                { email: { [Op.iLike]: `%${opts.search!.trim()}%` } }
+              ]
+            }
+          ]
+        }
+      : { kycStatus: statusFilter };
+    return User.count({ where, transaction });
+  }
+
+  /** Find users for admin KYC list: status in (PENDING, SUBMITTED, RESUBMITTED), optional status filter and search. */
+  async findForAdminKyc(
+    opts: { status?: KycStatus; search?: string; limit?: number; offset?: number } = {},
+    transaction?: Transaction
+  ): Promise<User[]> {
+    const statusFilter = opts.status ? opts.status : { [Op.in]: UserDao.ADMIN_KYC_STATUSES };
+    const where = opts.search?.trim()
+      ? {
+          [Op.and]: [
+            { kycStatus: statusFilter },
+            {
+              [Op.or]: [
+                { fullName: { [Op.iLike]: `%${opts.search!.trim()}%` } },
+                { email: { [Op.iLike]: `%${opts.search!.trim()}%` } }
+              ]
+            }
+          ]
+        }
+      : { kycStatus: statusFilter };
+    return User.findAll({
+      where,
+      attributes: ["id", "fullName", "email", "kycStatus", "kycStep", "createdAt"],
+      limit: Math.min(opts.limit ?? 50, 100),
+      offset: opts.offset ?? 0,
+      order: [["createdAt", "DESC"]],
+      transaction
+    });
+  }
+
   createUser(payload: {
     fullName: string;
     email: string;

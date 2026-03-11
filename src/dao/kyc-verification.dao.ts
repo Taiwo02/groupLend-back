@@ -15,6 +15,7 @@ export class KycVerificationDao {
       addressApproved?: boolean;
       creditHistoryApproved?: boolean;
       overallStatus?: KycVerificationStatus;
+      comment?: string | null;
     },
     transaction?: Transaction
   ): Promise<KycVerification> {
@@ -24,7 +25,8 @@ export class KycVerificationDao {
       bvnApproved: data.bvnApproved ?? existing?.bvnApproved ?? false,
       addressApproved: data.addressApproved ?? existing?.addressApproved ?? false,
       creditHistoryApproved: data.creditHistoryApproved ?? existing?.creditHistoryApproved ?? false,
-      overallStatus: data.overallStatus ?? existing?.overallStatus ?? "PENDING"
+      overallStatus: data.overallStatus ?? existing?.overallStatus ?? "PENDING",
+      comment: data.comment !== undefined ? data.comment : existing?.comment ?? null
     };
     if (existing) {
       await existing.update(payload, { transaction });

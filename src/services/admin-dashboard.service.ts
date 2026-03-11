@@ -98,7 +98,7 @@ export class AdminDashboardService {
       this.loanDao.countActive(),
       this.loanDao.countDefaulted(),
       this.getTotalDisbursedCount(),
-      this.userDao.countPendingKyc(),
+      this.userDao.countForAdminKyc(),
       this.loanDao.getPortfolioGrowthByWeek(),
       this.loanDao.findRecentWithBorrower(10),
       this.loanDao.countByPurpose()

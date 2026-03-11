@@ -1019,6 +1019,9 @@
                       "type": "string",
                       "enum": [
                         "PENDING",
+                        "SUBMITTED",
+                        "RESUBMITTED",
+                        "FLAGGED",
                         "APPROVED",
                         "REJECTED"
                       ]
@@ -1032,6 +1035,11 @@
                       "type": "string",
                       "format": "date-time",
                       "nullable": true
+                    },
+                    "comment": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Admin comment (e.g. what to update) when KYC is flagged or under review"
                     },
                     "data": {
                       "type": "object",
@@ -1382,6 +1390,30 @@
                         "SILVER",
                         "GOLD"
                       ]
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "Group deadline (e.g. quarterly end); null if not set"
+                    },
+                    "projectedAmount": {
+                      "type": "number",
+                      "description": "Projected amount (group target credit / goal)"
+                    },
+                    "nonAcceptedMemberships": {
+                      "type": "array",
+                      "description": "Members who have not yet accepted the group invite",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": { "type": "string", "format": "uuid" },
+                          "fullName": { "type": "string" },
+                          "email": { "type": "string" },
+                          "status": { "type": "string", "enum": ["INVITED"] },
+                          "invitedAt": { "type": "string", "format": "date-time", "nullable": true }
+                        }
+                      }
                     }
                   }
                 }
@@ -1566,6 +1598,125 @@
           "401": {
             "description": "Unauthorized"
           }
+        }
+      }
+    },
+    "/admin/kyc/count": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Count KYC in queue",
+        "description": "Count all KYC where status is PENDING, SUBMITTED, or RESUBMITTED. Optionally filter by status or search (fullName, email).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filter by single status (PENDING, SUBMITTED, or RESUBMITTED)",
+            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED"] }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Search by user fullName or email",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/admin/kyc": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List KYC in queue",
+        "description": "Fetch all KYC where status is PENDING, SUBMITTED, or RESUBMITTED. Optionally filter by status (if sent from front-end) or search by fullName/email.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filter by single status (PENDING, SUBMITTED, or RESUBMITTED); if omitted, returns all three",
+            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED"] }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Search by user fullName or email",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer", "description": "Total count matching filters" },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": { "type": "string", "format": "uuid" },
+                          "fullName": { "type": "string" },
+                          "email": { "type": "string" },
+                          "kycStatus": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED"] },
+                          "kycStep": { "type": "integer" },
+                          "createdAt": { "type": "string", "format": "date-time" },
+                          "comment": { "type": "string", "nullable": true, "description": "Admin comment for the user (what to update)" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
         }
       }
     },

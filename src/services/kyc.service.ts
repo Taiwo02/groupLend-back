@@ -16,6 +16,8 @@ export type KycStatusResponse = {
   kycStatus: KycStatus;
   kycStep: number;
   submittedAt: string | null;
+  /** Admin comment (e.g. what to update) when KYC is flagged or under review. */
+  comment: string | null;
   data: {
     ninData?: Record<string, unknown> | null;
     address?: Record<string, unknown> | null;
@@ -95,11 +97,15 @@ export class KycService {
     const user = await this.userDao.findById(userId);
     if (!user) throw new HttpError(401, "User not found");
 
-    const kycData = await this.userKycDataDao.findByUserId(userId);
+    const [kycData, verification] = await Promise.all([
+      this.userKycDataDao.findByUserId(userId),
+      this.kycVerificationDao.findByUserId(userId)
+    ]);
     return {
       kycStatus: user.kycStatus,
       kycStep: user.kycStep,
       submittedAt: kycData?.submittedAt?.toISOString() ?? null,
+      comment: verification?.comment ?? null,
       data: {
         ninData: (kycData?.ninData ?? null) as Record<string, unknown> | null,
         address: (kycData?.contact ?? null) as Record<string, unknown> | null,

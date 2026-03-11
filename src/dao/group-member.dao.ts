@@ -98,4 +98,12 @@ export class GroupMemberDao {
       transaction
     }).then((rows) => rows.map((r) => r.groupId));
   }
+
+  /** Members who have not yet accepted (status INVITED). */
+  findInvitedMembersByGroupId(groupId: string, transaction?: Transaction): Promise<GroupMember[]> {
+    return GroupMember.findAll({
+      where: { groupId, status: GroupMemberStatus.INVITED },
+      transaction
+    });
+  }
 }

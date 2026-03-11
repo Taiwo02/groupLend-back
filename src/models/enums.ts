@@ -1,8 +1,10 @@
 export enum KycStatus {
   PENDING = "PENDING",
+  SUBMITTED = "SUBMITTED",
+  RESUBMITTED = "RESUBMITTED",
+  FLAGGED = "FLAGGED",
   APPROVED = "APPROVED",
-  REJECTED = "REJECTED",
-  SUBMITTED = "SUBMITTED"
+  REJECTED = "REJECTED"
 }
 
 export enum CreditStatus {
