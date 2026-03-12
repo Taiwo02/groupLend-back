@@ -15,6 +15,7 @@ export class KycVerification extends Model<
 > {
   declare id: CreationOptional<string>;
   declare userId: string;
+  declare kycDataId: string | null;
   declare ninApproved: boolean;
   declare bvnApproved: boolean;
   declare addressApproved: boolean;
@@ -35,8 +36,11 @@ KycVerification.init(
     },
     userId: {
       type: DataTypes.UUID,
-      allowNull: false,
-      unique: true
+      allowNull: false
+    },
+    kycDataId: {
+      type: DataTypes.UUID,
+      allowNull: true
     },
     ninApproved: {
       type: DataTypes.BOOLEAN,

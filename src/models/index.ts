@@ -16,12 +16,12 @@ import { UserKycOtp } from "./user-kyc-otp.model.js";
 import { KycVerification } from "./kyc-verification.model.js";
 
 export const initModelAssociations = (): void => {
-  User.hasOne(UserKycData, { foreignKey: "userId", as: "kycData" });
+  User.hasMany(UserKycData, { foreignKey: "userId", as: "kycDataRecords" });
   UserKycData.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-  UserKycData.hasOne(KycVerification, { foreignKey: "userId", as: "verification" });
-  KycVerification.belongsTo(UserKycData, { foreignKey: "userId", targetKey: "userId", as: "kycData" });
-  User.hasOne(KycVerification, { foreignKey: "userId", as: "kycVerification" });
+  UserKycData.hasOne(KycVerification, { foreignKey: "kycDataId", as: "verification" });
+  KycVerification.belongsTo(UserKycData, { foreignKey: "kycDataId", as: "kycData" });
+  User.hasMany(KycVerification, { foreignKey: "userId", as: "kycVerifications" });
   KycVerification.belongsTo(User, { foreignKey: "userId", as: "user" });
 
   User.hasOne(UserKycOtp, { foreignKey: "userId", as: "kycOtp" });

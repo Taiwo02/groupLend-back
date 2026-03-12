@@ -97,10 +97,11 @@ export class KycService {
     const user = await this.userDao.findById(userId);
     if (!user) throw new HttpError(401, "User not found");
 
-    const [kycData, verification] = await Promise.all([
-      this.userKycDataDao.findByUserId(userId),
-      this.kycVerificationDao.findByUserId(userId)
-    ]);
+    const kycData = await this.userKycDataDao.findByUserId(userId);
+    const verification =
+      kycData?.id && kycData.submittedAt
+        ? await this.kycVerificationDao.findByKycDataId(kycData.id)
+        : null;
     return {
       kycStatus: user.kycStatus,
       kycStep: user.kycStep,
@@ -181,8 +182,18 @@ export class KycService {
     }
     await this.userDao.updateKycStep(userId, nextStep);
     if (nextStep === KYC_MAX_STEP) {
-      await this.userKycDataDao.upsert(userId, { submittedAt: new Date() });
-      await this.kycVerificationDao.upsert(userId, { overallStatus: "PENDING" });
+      const draft = await this.userKycDataDao.findDraftByUserId(userId);
+      if (!draft) throw new HttpError(400, "No draft KYC data to submit");
+      const submitted = await this.userKycDataDao.createSubmitted(userId, {
+        bioData: draft.bioData,
+        contact: draft.contact,
+        employmentDetails: draft.employmentDetails,
+        profilePicture: draft.profilePicture,
+        ninData: draft.ninData,
+        bvnEncrypted: draft.bvnEncrypted,
+        ninLookupKey: draft.ninLookupKey
+      });
+      await this.kycVerificationDao.upsertByKycDataId(submitted.id, userId, { overallStatus: "PENDING" });
       result.message = "KYC submitted successfully; we will get back to you soon";
     }
     return result;

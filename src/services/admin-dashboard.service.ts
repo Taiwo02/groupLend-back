@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import { LoanDao } from "../dao/loan.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { UserDao } from "../dao/user.dao.js";
+import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { Loan, Repayment, User } from "../models/index.js";
 import { LoanStatus } from "../models/enums.js";
 import { toNumber } from "../utils/number.js";
@@ -80,6 +81,7 @@ export class AdminDashboardService {
   constructor(
     private readonly loanDao: LoanDao,
     private readonly userDao: UserDao,
+    private readonly userKycDataDao: UserKycDataDao,
     private readonly repaymentDao: RepaymentDao
   ) {}
 
@@ -98,7 +100,7 @@ export class AdminDashboardService {
       this.loanDao.countActive(),
       this.loanDao.countDefaulted(),
       this.getTotalDisbursedCount(),
-      this.userDao.countForAdminKyc(),
+      this.userKycDataDao.countForAdminList(),
       this.loanDao.getPortfolioGrowthByWeek(),
       this.loanDao.findRecentWithBorrower(10),
       this.loanDao.countByPurpose()

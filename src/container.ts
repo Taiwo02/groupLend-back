@@ -140,8 +140,8 @@ function createContainer() {
     repaymentDao,
     notificationDao
   );
-  const adminDashboardService = new AdminDashboardService(loanDao, userDao, repaymentDao);
-  const adminKycService = new AdminKycService(userDao, kycVerificationDao);
+  const adminDashboardService = new AdminDashboardService(loanDao, userDao, userKycDataDao, repaymentDao);
+  const adminKycService = new AdminKycService(userDao, userKycDataDao, kycVerificationDao);
 
   const authController = new AuthController(authService);
   const invitationController = new InvitationController(invitationService);

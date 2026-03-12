@@ -1,16 +1,12 @@
 import { Context } from "hono";
 import { AdminKycService } from "../services/admin-kyc.service.js";
-import { KycStatus } from "../models/enums.js";
+import type { KycRecordStatus } from "../models/user-kyc-data.model.js";
 
-const VALID_STATUSES = new Set<KycStatus>([
-  KycStatus.PENDING,
-  KycStatus.SUBMITTED,
-  KycStatus.RESUBMITTED
-]);
+const VALID_STATUSES = new Set<KycRecordStatus>(["PENDING", "SUBMITTED", "RESUBMITTED"]);
 
-function parseStatus(value: string | undefined): KycStatus | undefined {
+function parseStatus(value: string | undefined): KycRecordStatus | undefined {
   if (!value?.trim()) return undefined;
-  const s = value.toUpperCase() as KycStatus;
+  const s = value.toUpperCase() as KycRecordStatus;
   return VALID_STATUSES.has(s) ? s : undefined;
 }
 
@@ -30,6 +26,18 @@ export class AdminKycController {
     const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
     const offset = Math.max(0, Number(c.req.query("offset")) || 0);
     const data = await this.adminKycService.getKycList({ status, search, limit, offset });
+    return c.json(data);
+  }
+
+  async getKycDetails(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const data = await this.adminKycService.getKycDetails(kycId);
+    return c.json(data);
+  }
+
+  async approveKyc(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const data = await this.adminKycService.approveKyc(kycId);
     return c.json(data);
   }
 }

@@ -41,11 +41,15 @@ export interface ConfirmedAddressPayload {
   state?: string;
 }
 
+export type KycRecordStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "FLAGGED" | "RESUBMITTED";
+
 export class UserKycData extends Model<
   InferAttributes<UserKycData>,
   InferCreationAttributes<UserKycData>
 > {
+  declare id: CreationOptional<string>;
   declare userId: string;
+  declare status: KycRecordStatus;
   declare bioData: BioDataPayload | null;
   declare contact: ContactPayload | null;
   declare employmentDetails: EmploymentDetailsPayload | null;
@@ -60,9 +64,19 @@ export class UserKycData extends Model<
 
 UserKycData.init(
   {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
+    },
     userId: {
       type: DataTypes.UUID,
-      primaryKey: true
+      allowNull: false
+    },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "PENDING"
     },
     bioData: {
       type: DataTypes.JSONB,
