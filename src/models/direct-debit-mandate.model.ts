@@ -16,6 +16,9 @@ export class DirectDebitMandate extends Model<
   declare userId: string;
   declare groupId: string | null;
   declare status: MandateStatus;
+  declare monoSessionId: string | null;
+  declare monoCustomerId: string | null;
+  declare lastResendAt: Date | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -38,7 +41,22 @@ DirectDebitMandate.init(
     status: {
       type: DataTypes.ENUM(...Object.values(MandateStatus)),
       allowNull: false,
-      defaultValue: MandateStatus.ACTIVE
+      defaultValue: MandateStatus.INACTIVE
+    },
+    monoSessionId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "mono_session_id"
+    },
+    monoCustomerId: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+      field: "mono_customer_id"
+    },
+    lastResendAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "last_resend_at"
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

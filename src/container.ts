@@ -8,6 +8,7 @@ import { DashboardController } from "./controllers/dashboard.controller.js";
 import { AdminDashboardController } from "./controllers/admin-dashboard.controller.js";
 import { AdminKycController } from "./controllers/admin-kyc.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
+import { DirectDebitMandateController } from "./controllers/direct-debit-mandate.controller.js";
 import { LoanController } from "./controllers/loan.controller.js";
 import { RepaymentController } from "./controllers/repayment.controller.js";
 import { DbDao } from "./dao/db.dao.js";
@@ -40,6 +41,7 @@ import { AdminKycService } from "./services/admin-kyc.service.js";
 import { GroupService } from "./services/group.service.js";
 import { InvitationService } from "./services/invitation.service.js";
 import { NotificationService } from "./services/notification.service.js";
+import { DirectDebitMandateService } from "./services/direct-debit-mandate.service.js";
 import { LoanService } from "./services/loan.service.js";
 import { QuarterlyService } from "./services/quarterly.service.js";
 import { RepaymentService } from "./services/repayment.service.js";
@@ -101,7 +103,8 @@ function createContainer() {
     userDao,
     trustService,
     notificationService,
-    emailService
+    emailService,
+    directDebitMandateDao
   );
   const groupService = new GroupService(
     dbDao,
@@ -112,6 +115,15 @@ function createContainer() {
     creditService,
     notificationService,
     emailService
+  );
+  const directDebitMandateService = new DirectDebitMandateService(
+    directDebitMandateDao,
+    groupMemberDao,
+    userDao,
+    userKycDataDao,
+    mandateDao,
+    memberMandateDao,
+    accountDao
   );
   const invitationService = new InvitationService(
     dbDao,
@@ -141,7 +153,7 @@ function createContainer() {
     notificationDao
   );
   const adminDashboardService = new AdminDashboardService(loanDao, userDao, userKycDataDao, repaymentDao);
-  const adminKycService = new AdminKycService(userDao, userKycDataDao, kycVerificationDao);
+  const adminKycService = new AdminKycService(userDao, userKycDataDao, kycVerificationDao, statementDao);
 
   const authController = new AuthController(authService);
   const invitationController = new InvitationController(invitationService);
@@ -156,6 +168,7 @@ function createContainer() {
   const adminKycController = new AdminKycController(adminKycService);
   const loanController = new LoanController(loanService, approvalService, userDao);
   const groupController = new GroupController(groupService);
+  const directDebitMandateController = new DirectDebitMandateController(directDebitMandateService);
   const repaymentController = new RepaymentController(repaymentService);
 
   const requireOnboardingComplete = requireOnboardingCompleteFactory(userDao);
@@ -184,6 +197,7 @@ function createContainer() {
     adminKycController,
     loanController,
     groupController,
+    directDebitMandateController,
     repaymentController,
     requireOnboardingComplete,
     directDebitMandateDao,

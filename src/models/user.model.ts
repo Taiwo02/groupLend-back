@@ -29,6 +29,7 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   declare emailVerificationTokenExpiresAt: Date | null;
   declare passwordResetToken: string | null;
   declare passwordResetTokenExpiresAt: Date | null;
+  declare monoCustomerId: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -124,6 +125,11 @@ User.init(
     passwordResetTokenExpiresAt: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    monoCustomerId: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+      field: "mono_customer_id"
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

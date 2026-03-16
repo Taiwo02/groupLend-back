@@ -44,6 +44,7 @@ export enum ApprovalDecision {
 
 export enum MandateStatus {
   ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
   FAILED = "FAILED"
 }
 

@@ -1725,6 +1725,7 @@
     },
     "/admin/kyc/{kycId}": {
       "get": {
+        "operationId": "getDetails",
         "tags": ["Admin"],
         "summary": "Get KYC details",
         "description": "Get full KYC details by kycId. BVN value is not returned; only a bvnProvided flag. A user can have multiple KYC records.",
@@ -1823,6 +1824,109 @@
         }
       }
     },
+    "/admin/kyc/{kycId}/reject": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Reject KYC",
+        "description": "Reject KYC by kycId. Optionally send comment in body for the user.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "comment": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" } } } } },
+          "400": { "description": "Cannot reject approved KYC" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "KYC record not found" }
+        }
+      }
+    }
+  },
+    "/admin/kyc/{kycId}/verify/address": {
+      "post": {
+        "operationId": "verifyAddress",
+        "tags": ["Admin"],
+        "summary": "Verify address",
+        "description": "Verify address via third-party (Mono). Updates kyc_verifications.addressApproved.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "message": { "type": "string" } } } } },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "KYC record not found" }
+        }
+      }
+    }
+  },
+    "/admin/kyc/{kycId}/verify/credit-history": {
+      "post": {
+        "operationId": "creditHistory",
+        "tags": ["Admin"],
+        "summary": "Verify credit history",
+        "description": "Verify credit history via third-party (Mono v3 BVN lookup). Updates kyc_verifications.creditHistoryApproved. If already verified, skips the API call to avoid cost. Requires BVN on the KYC record.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "message": { "type": "string" } } } } },
+          "400": { "description": "No BVN on KYC record or BVN decryption failed" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "KYC record not found" }
+        }
+      }
+    }
+  },
+    "/admin/kyc/{kycId}/statement": {
+      "get": {
+        "operationId": "fetchStatement",
+        "tags": ["Admin"],
+        "summary": "Fetch statement",
+        "description": "If statement exists in DB for this KYC's user, return it. Otherwise fetch via third-party (Mono), save to DB, and return.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statement": { "type": "object" },
+                    "fromCache": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "No linked account to fetch statement" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "KYC record not found" },
+          "502": { "description": "Third-party statement fetch failed" }
+        }
+      }
+    },
+    "/admin/kyc/{kycId}/verify/nin": {
+      "post": {
+        "operationId": "verifyNin",
+        "tags": ["Admin"],
+        "summary": "Verify NIN",
+        "description": "Verify NIN via third-party (Mono lookup). Updates kyc_verifications.ninApproved.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "message": { "type": "string" } } } } },
+          "400": { "description": "No NIN on KYC record" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "KYC record not found" }
+        }
+      }
+    }
+  },
     "/groups": {
       "post": {
         "tags": [
@@ -2187,12 +2291,189 @@
         }
       }
     },
+    "/groups/{groupId}/direct-debit-mandate": {
+      "get": {
+        "operationId": "getDirectDebitMandate",
+        "tags": ["Groups"],
+        "summary": "Get my direct debit mandate for a group",
+        "description": "Returns the current user's direct debit mandate for the group, if any. Required to be an active group member.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": {
+                      "oneOf": [
+                        { "type": "null" },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "string", "format": "uuid" },
+                            "groupId": { "type": "string", "format": "uuid", "nullable": true },
+                            "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "FAILED"] },
+                            "createdAt": { "type": "string", "format": "date-time" }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": { "description": "Not an active member of this group" }
+        }
+      },
+      "post": {
+        "operationId": "createDirectDebitMandate",
+        "tags": ["Groups"],
+        "summary": "Create direct debit mandate for a group",
+        "description": "Create a direct debit mandate for the current user and group (status INACTIVE). User must be an active member. Only one mandate per user per group; if one already exists it is returned. After creation, use authorize then confirm to activate.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "groupId": { "type": "string", "format": "uuid", "nullable": true },
+                        "status": { "type": "string" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Already have an active mandate for this group" },
+          "403": { "description": "Not an active member of this group" }
+        }
+      }
+    },
+    "/groups/{groupId}/direct-debit-mandate/{mandateId}/authorize": {
+      "post": {
+        "operationId": "authorizeDirectDebitMandate",
+        "tags": ["Groups"],
+        "summary": "Start or resend BVN authorization (send OTP)",
+        "description": "Initiates Mono BVN verification and sends OTP to the user's phone or email. Mandate must be INACTIVE. Uses BVN and contact from KYC. Resend is throttled to once per 3 hours. Body: { \"resend\": false }.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "mandateId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "resend": { "type": "boolean", "default": false } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "data": { "type": "object", "nullable": true, "properties": { "sessionId": { "type": "string" } } }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Mandate not INACTIVE, KYC/BVN missing, BVN init or OTP failed, or resend throttled (try again later)"
+          },
+          "403": { "description": "Not your mandate" },
+          "404": { "description": "Mandate not found" }
+        }
+      }
+    },
+    "/groups/{groupId}/direct-debit-mandate/{mandateId}/confirm": {
+      "post": {
+        "operationId": "confirmDirectDebitMandate",
+        "tags": ["Groups"],
+        "summary": "Confirm mandate with OTP and link accounts",
+        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. Creates or reuses Mono customer (mono_customer_id stored on user and mandate). Request body: otp (required), optional maxDebitAmount (NGN) for mandate amount.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "mandateId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["otp"],
+                "properties": {
+                  "otp": { "type": "string", "description": "OTP received from authorize step" },
+                  "maxDebitAmount": { "type": "number", "description": "Max debit amount in NGN (default 1,000,000)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "groupId": { "type": "string", "format": "uuid", "nullable": true },
+                        "status": { "type": "string" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Mandate not pending, authorize first, invalid OTP, no accounts returned, or Mono customer/create failed"
+          },
+          "403": { "description": "Not your mandate" },
+          "404": { "description": "Mandate not found" }
+        }
+      }
+    },
     "/loans/individual": {
       "post": {
-        "tags": [
-          "Loans"
-        ],
-        "summary": "Request individual loan (requires onboarding + loan PIN)",
+        "operationId": "requestIndividualLoan",
+        "tags": ["Loans"],
+        "summary": "Request individual loan",
+        "description": "Create an individual (non-group) loan for the authenticated user. Amount must not exceed the user's credit limit. Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -2264,10 +2545,10 @@
     },
     "/loans/group": {
       "post": {
-        "tags": [
-          "Loans"
-        ],
-        "summary": "Request group loan (requires onboarding + loan PIN)",
+        "operationId": "requestGroupLoan",
+        "tags": ["Loans"],
+        "summary": "Request group loan",
+        "description": "Create a group loan; all active group members must approve. Each approver must have an active direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -2347,10 +2628,10 @@
     },
     "/loans/{id}": {
       "get": {
-        "tags": [
-          "Loans"
-        ],
-        "summary": "Get loan by ID (borrower or approver)",
+        "operationId": "getLoan",
+        "tags": ["Loans"],
+        "summary": "Get loan by ID",
+        "description": "Return loan details. Allowed for the borrower or for a group member who is an approver for this loan.",
         "security": [
           {
             "bearerAuth": []
@@ -2389,24 +2670,17 @@
     },
     "/loans/{id}/approve": {
       "post": {
-        "tags": [
-          "Loans"
-        ],
-        "summary": "Approve a group loan (requires onboarding + loan PIN)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "operationId": "approveLoan",
+        "tags": ["Loans"],
+        "summary": "Approve a group loan",
+        "description": "Record the caller's approval for a group loan. Only active group members can approve. For group loans, the approver must have an active direct debit mandate for the group (created and authorized within the last 12 months). If the approver has no running mandate, they must create and authorize direct debit on their account(s) before they can approve. Requires onboarding complete and request body with loanPin (6 digits). When all members have approved, the loan moves to APPROVED and is disbursed.",
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "requestBody": {
@@ -2415,14 +2689,9 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "loanPin"
-                ],
+                "required": ["loanPin"],
                 "properties": {
-                  "loanPin": {
-                    "type": "string",
-                    "pattern": "^\\d{6}$"
-                  }
+                  "loanPin": { "type": "string", "pattern": "^\\d{6}$" }
                 }
               }
             }
@@ -2433,17 +2702,15 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Loan"
-                }
+                "schema": { "$ref": "#/components/schemas/Loan" }
               }
             }
           },
           "400": {
-            "description": "Not pending or already rejected / mandate not ACTIVE"
+            "description": "Loan not pending approval, already has a rejection, or approver must have an active direct debit mandate for this group (create/authorize mandate first)"
           },
           "403": {
-            "description": "Not eligible or invalid PIN"
+            "description": "Not an active group member, not eligible to approve this loan, or invalid loan PIN"
           },
           "404": {
             "description": "Loan not found"
@@ -2453,10 +2720,10 @@
     },
     "/loans/{id}/institutional-approval": {
       "post": {
-        "tags": [
-          "Loans"
-        ],
-        "summary": "Partner callback: continue group approval after institutional approval",
+        "operationId": "institutionalApprovalCallback",
+        "tags": ["Loans"],
+        "summary": "Partner callback: continue after institutional approval",
+        "description": "Called by partner/lender when an institutional group loan is approved. Moves loan from INSTITUTIONAL_PENDING to PENDING_APPROVAL and creates pending approval records for group members.",
         "security": [
           {
             "bearerAuth": []
@@ -2489,6 +2756,56 @@
           },
           "404": {
             "description": "Not found"
+          }
+        }
+      }
+    },
+    "/loans/{id}/reject": {
+      "post": {
+        "operationId": "rejectLoan",
+        "tags": ["Loans"],
+        "summary": "Reject a group loan",
+        "description": "Record the caller's rejection for a group loan. Only active group members can reject. Requires onboarding complete and loan PIN in body. Once any member rejects, the loan status becomes REJECTED.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["loanPin"],
+                "properties": {
+                  "loanPin": { "type": "string", "pattern": "^\\d{6}$" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Loan" }
+              }
+            }
+          },
+          "400": {
+            "description": "Loan not pending approval or caller already responded"
+          },
+          "403": {
+            "description": "Not an active group member or invalid loan PIN"
+          },
+          "404": {
+            "description": "Loan not found"
           }
         }
       }
@@ -2550,8 +2867,9 @@
           }
         }
       }
-    },
-    "components": {
+    }
+  },
+  "components": {
       "securitySchemes": {
         "bearerAuth": {
           "type": "http",
@@ -2883,4 +3201,3 @@
       }
     }
   }
-}

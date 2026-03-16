@@ -219,3 +219,187 @@ export async function getDetails(accountId: string): Promise<{ ok: boolean; data
     return { ok: false, message: e instanceof Error ? e.message : "Details request failed" };
   }
 }
+
+/** Verify address via third-party (Mono lookup). */
+export async function verifyAddress(address: Record<string, unknown>): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/address`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...monoHeaders() },
+      body: JSON.stringify(address)
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (res.ok && (data.status === "successful" || data.data != null)) {
+      return { ok: true, data: (data.data as Record<string, unknown>) ?? (data as Record<string, unknown>) };
+    }
+    return { ok: false, message: (data.message as string) ?? "Address verification failed" };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Address verification request failed" };
+  }
+}
+
+export async function getCreditHistoryByBvn(bvn: string): Promise<{
+  ok: boolean;
+  data?: Record<string, unknown>;
+  message?: string;
+}> {
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/credit-history/all`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        accept: "application/json",
+        ...(env.monoLookUpdId ? { "mono-sec-key": env.monoLookUpdId } : {})
+      },
+      body: JSON.stringify({ bvn: bvn.trim() })
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) {
+      const message = (data.message as string) ?? (data.error as string) ?? "Credit history lookup failed";
+      return { ok: false, message };
+    }
+    return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Credit history request failed"
+    };
+  }
+}
+
+export async function initiateBvn(
+  bvn: string,
+  scope: string
+): Promise<Record<string, unknown>> {
+  const url = "https://api.withmono.com/v2/lookup/bvn/initiate";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      accept: "application/json",
+      ...(env.monoLookUpdId ? { "mono-sec-key": env.monoLookUpdId } : {})
+    },
+    body: JSON.stringify({ bvn: bvn.trim(), scope })
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return data;
+}
+
+export async function sendBvnOtp(
+  phone: string,
+  monoSessionId: string,
+  method: string
+): Promise<Record<string, unknown>> {
+  const url = "https://api.withmono.com/v2/lookup/bvn/verify";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      accept: "application/json",
+      ...(env.monoLookUpdId ? { "mono-sec-key": env.monoLookUpdId } : {}),
+      "x-session-id": monoSessionId
+    },
+    body: JSON.stringify({ method, phone_number: phone })
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return data;
+}
+
+/** Helper to pick BVN verification method (phone/email/alternate_phone). */
+export function filterBvnMethod(
+  methods: { method?: string | null }[] | undefined,
+  preferredMethod: string
+) {
+  if (!methods) return undefined;
+  return methods.find(
+    (m) => m.method === preferredMethod || m.method === "alternate_phone"
+  );
+}
+
+/** Mono Connect: create customer (v2/customers). Uses env.monoId (MONO_ID). */
+export async function createMonoCustomer(payload: {
+  bvn: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  address?: string | null;
+  phone?: string | null;
+}): Promise<Record<string, unknown>> {
+  const url = "https://api.withmono.com/v2/customers";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      accept: "application/json",
+      ...(env.monoId ? { "mono-sec-key": env.monoId } : {})
+    },
+    body: JSON.stringify({
+      identity: { type: "bvn", number: payload.bvn.trim() },
+      email: payload.email,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      ...(payload.address != null && payload.address !== "" ? { address: payload.address } : {}),
+      ...(payload.phone != null && payload.phone !== "" ? { phone: payload.phone } : {})
+    })
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return data;
+}
+
+/** Fetch BVN-linked accounts after OTP verification (v2/lookup/bvn/details). Uses env.monoLookUpdId. */
+export async function fetchBvnDetails(
+  otp: string,
+  monoSessionId: string
+): Promise<Record<string, unknown>> {
+  const url = "https://api.withmono.com/v2/lookup/bvn/details";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      accept: "application/json",
+      ...(env.monoLookUpdId ? { "mono-sec-key": env.monoLookUpdId } : {}),
+      "x-session-id": monoSessionId
+    },
+    body: JSON.stringify({ otp: otp.trim() })
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return data;
+}
+
+/** Create direct debit mandate (v3/payments/mandates). Uses env.monoId. Amount in kobo. */
+export async function createPaymentMandate(payload: {
+  monoCustomerId: string;
+  accountNumber: string;
+  bankCode: string;
+  amountKobo: number;
+  startDate: string;
+  endDate: string;
+  reference: string;
+  description?: string;
+}): Promise<Record<string, unknown>> {
+  const url = "https://api.withmono.com/v3/payments/mandates";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      accept: "application/json",
+      ...(env.monoId ? { "mono-sec-key": env.monoId } : {})
+    },
+    body: JSON.stringify({
+      debit_type: "variable",
+      customer: payload.monoCustomerId,
+      mandate_type: "emandate",
+      amount: payload.amountKobo,
+      reference: payload.reference,
+      account_number: payload.accountNumber,
+      bank_code: payload.bankCode,
+      description: payload.description ?? "Credit repayment",
+      start_date: payload.startDate,
+      end_date: payload.endDate
+    })
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return data;
+}

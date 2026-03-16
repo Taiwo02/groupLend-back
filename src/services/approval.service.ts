@@ -1,10 +1,11 @@
 import { DbDao } from "../dao/db.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
+import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao.js";
 import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
 import { LoanDao } from "../dao/loan.dao.js";
 import { UserDao } from "../dao/user.dao.js";
 import { Loan } from "../models/index.js";
-import { ApprovalDecision, LoanStatus } from "../models/enums.js";
+import { ApprovalDecision, LoanStatus, MandateStatus } from "../models/enums.js";
 import { GroupMemberStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { EmailService } from "../email/email.service.js";
@@ -22,7 +23,8 @@ export class ApprovalService {
     private readonly userDao: UserDao,
     private readonly trustService: TrustService,
     private readonly notificationService: NotificationService,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly directDebitMandateDao: DirectDebitMandateDao
   ) {}
 
   async approveLoan(loanId: string, approverId: string): Promise<Loan> {
@@ -41,6 +43,23 @@ export class ApprovalService {
         );
         if (!approverMembership || approverMembership.status !== GroupMemberStatus.ACTIVE) {
           throw new HttpError(403, "Only active group members can approve; exit request restricts approval");
+        }
+
+        // Ensure approver has a running (ACTIVE) direct debit mandate for this group.
+        const directMandate = await this.directDebitMandateDao.findByUserAndGroup(
+          approverId,
+          loan.groupId,
+          transaction
+        );
+        const hasRunningMandate =
+          directMandate &&
+          directMandate.status === MandateStatus.ACTIVE &&
+          this.isMandateWithinYear(directMandate.createdAt ?? new Date(0));
+        if (!hasRunningMandate) {
+          throw new HttpError(
+            400,
+            "You must create and authorize a direct debit mandate for this group in the last 12 months before approving this loan"
+          );
         }
       }
 
@@ -92,9 +111,16 @@ export class ApprovalService {
         }
         return disbursed;
       }
-
       return loan;
     });
+  }
+
+  /** Treat mandate as valid for 12 months from creation. */
+  private isMandateWithinYear(createdAt: Date): boolean {
+    const now = new Date();
+    const oneYearAgo = new Date(now);
+    oneYearAgo.setFullYear(now.getFullYear() - 1);
+    return createdAt >= oneYearAgo;
   }
 
   async rejectLoan(loanId: string, approverId: string): Promise<Loan> {

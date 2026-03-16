@@ -40,4 +40,35 @@ export class AdminKycController {
     const data = await this.adminKycService.approveKyc(kycId);
     return c.json(data);
   }
+
+  async rejectKyc(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const body = await c.req.json().catch(() => ({})) as { comment?: string };
+    const data = await this.adminKycService.rejectKyc(kycId, body.comment);
+    return c.json(data);
+  }
+
+  async verifyAddress(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const data = await this.adminKycService.verifyAddress(kycId);
+    return c.json(data);
+  }
+
+  async verifyCreditHistory(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const data = await this.adminKycService.verifyCreditHistory(kycId);
+    return c.json(data);
+  }
+
+  async fetchStatement(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const data = await this.adminKycService.fetchStatement(kycId);
+    return c.json(data);
+  }
+
+  async verifyNin(c: Context): Promise<Response> {
+    const kycId = c.req.param("kycId");
+    const data = await this.adminKycService.verifyNin(kycId);
+    return c.json(data);
+  }
 }

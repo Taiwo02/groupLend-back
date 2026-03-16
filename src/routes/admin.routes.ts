@@ -16,6 +16,11 @@ export function createAdminRoutes(
   routes.get("/kyc", (c) => adminKycController.getKycList(c));
   routes.get("/kyc/:kycId", (c) => adminKycController.getKycDetails(c));
   routes.post("/kyc/:kycId/approve", (c) => adminKycController.approveKyc(c));
+  routes.post("/kyc/:kycId/reject", (c) => adminKycController.rejectKyc(c));
+  routes.post("/kyc/:kycId/verify/address", (c) => adminKycController.verifyAddress(c));
+  routes.post("/kyc/:kycId/verify/credit-history", (c) => adminKycController.verifyCreditHistory(c));
+  routes.get("/kyc/:kycId/statement", (c) => adminKycController.fetchStatement(c));
+  routes.post("/kyc/:kycId/verify/nin", (c) => adminKycController.verifyNin(c));
 
   return routes;
 }
