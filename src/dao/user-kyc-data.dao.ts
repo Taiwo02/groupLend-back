@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, type WhereOptions } from "sequelize";
 import { Transaction } from "sequelize";
 import { UserKycData } from "../models/index.js";
 import type { KycStatus } from "../models/enums.js";
@@ -110,16 +110,25 @@ export class UserKycDataDao {
   ): Promise<UserKycData[]> {
     const where: Record<string, unknown> = {};
     if (opts.userKycStatus != null || opts.search?.trim()) {
-      const userWhere: Record<string, unknown> = {};
-      if (opts.userKycStatus != null) {
-        userWhere.kycStatus = opts.userKycStatus;
-      }
-      if (opts.search?.trim()) {
-        const q = opts.search.trim();
-        userWhere[Op.or] = [
-          { fullName: { [Op.iLike]: `%${q}%` } },
-          { email: { [Op.iLike]: `%${q}%` } }
-        ];
+      const q = opts.search?.trim();
+      let userWhere: WhereOptions;
+      if (opts.userKycStatus != null && q) {
+        userWhere = {
+          kycStatus: opts.userKycStatus,
+          [Op.or]: [
+            { fullName: { [Op.iLike]: `%${q}%` } },
+            { email: { [Op.iLike]: `%${q}%` } }
+          ]
+        };
+      } else if (opts.userKycStatus != null) {
+        userWhere = { kycStatus: opts.userKycStatus };
+      } else {
+        userWhere = {
+          [Op.or]: [
+            { fullName: { [Op.iLike]: `%${q}%` } },
+            { email: { [Op.iLike]: `%${q}%` } }
+          ]
+        };
       }
       const { User } = await import("../models/index.js");
       const users = await User.findAll({
@@ -146,16 +155,25 @@ export class UserKycDataDao {
   ): Promise<number> {
     const where: Record<string, unknown> = {};
     if (opts.userKycStatus != null || opts.search?.trim()) {
-      const userWhere: Record<string, unknown> = {};
-      if (opts.userKycStatus != null) {
-        userWhere.kycStatus = opts.userKycStatus;
-      }
-      if (opts.search?.trim()) {
-        const q = opts.search.trim();
-        userWhere[Op.or] = [
-          { fullName: { [Op.iLike]: `%${q}%` } },
-          { email: { [Op.iLike]: `%${q}%` } }
-        ];
+      const q = opts.search?.trim();
+      let userWhere: WhereOptions;
+      if (opts.userKycStatus != null && q) {
+        userWhere = {
+          kycStatus: opts.userKycStatus,
+          [Op.or]: [
+            { fullName: { [Op.iLike]: `%${q}%` } },
+            { email: { [Op.iLike]: `%${q}%` } }
+          ]
+        };
+      } else if (opts.userKycStatus != null) {
+        userWhere = { kycStatus: opts.userKycStatus };
+      } else {
+        userWhere = {
+          [Op.or]: [
+            { fullName: { [Op.iLike]: `%${q}%` } },
+            { email: { [Op.iLike]: `%${q}%` } }
+          ]
+        };
       }
       const { User } = await import("../models/index.js");
       const users = await User.findAll({

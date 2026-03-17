@@ -1,3 +1,4 @@
+import { QueryTypes } from "sequelize";
 import type { MigrationContext } from "./types.js";
 
 /**
@@ -15,10 +16,11 @@ export async function up({ context }: { context: MigrationContext }): Promise<vo
       ADD COLUMN IF NOT EXISTS "last_resend_at" TIMESTAMP WITH TIME ZONE;
   `);
 
-  const [rows] = await context.sequelize.query<{ data_type: string }>(
-    `SELECT data_type FROM information_schema.columns WHERE table_name = 'direct_debit_mandates' AND column_name = 'status';`
-  );
-  const isEnum = rows?.[0]?.data_type === "USER-DEFINED";
+  const rows = (await context.sequelize.query(
+    `SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'direct_debit_mandates' AND column_name = 'status' LIMIT 1`,
+    { type: QueryTypes.SELECT }
+  )) as { data_type: string }[];
+  const isEnum = rows[0]?.data_type === "USER-DEFINED";
 
   if (isEnum) {
     await q(`ALTER TYPE enum_direct_debit_mandates_status ADD VALUE IF NOT EXISTS 'INACTIVE';`);
@@ -34,10 +36,11 @@ export async function up({ context }: { context: MigrationContext }): Promise<vo
 
 export async function down({ context }: { context: MigrationContext }): Promise<void> {
   const q = context.sequelize.query.bind(context.sequelize);
-  const [rows] = await context.sequelize.query<{ data_type: string }>(
-    `SELECT data_type FROM information_schema.columns WHERE table_name = 'direct_debit_mandates' AND column_name = 'status';`
-  );
-  const isEnum = rows?.[0]?.data_type === "USER-DEFINED";
+  const rowsDown = (await context.sequelize.query(
+    `SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'direct_debit_mandates' AND column_name = 'status' LIMIT 1`,
+    { type: QueryTypes.SELECT }
+  )) as { data_type: string }[];
+  const isEnum = rowsDown[0]?.data_type === "USER-DEFINED";
   if (!isEnum) {
     await q(`ALTER TABLE "direct_debit_mandates" DROP CONSTRAINT IF EXISTS "direct_debit_mandates_status_check";`);
     await q(`
