@@ -260,7 +260,6 @@ export class AdminKycService {
     const accountId = existing?.accountId ?? (existing?.extraData as Record<string, unknown> | undefined)?.accountId as string | undefined;
     if (!accountId) throw new HttpError(400, "No linked account to fetch statement");
     const result = await monoGetStatement(accountId);
-    console.log(result);
     
     if (!result.ok || result.data == null) throw new HttpError(502, result.message ?? "Failed to fetch statement");
     await this.statementDao.createOrUpdate(record.userId, { statement: result.data });

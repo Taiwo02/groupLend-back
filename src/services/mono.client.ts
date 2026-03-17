@@ -55,7 +55,7 @@ export interface BankListResult {
 export async function lookupNin(nin: string): Promise<NinLookupResult> {
 
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/nin`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/nin`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -88,7 +88,7 @@ export async function verifyAccount(
   bankCode: string
 ): Promise<AccountLookupResult> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/account-number`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/account-number`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -121,7 +121,7 @@ export async function verifyAccount(
  */
 export async function getBankList(): Promise<BankListResult> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/banks`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/banks`;
     const res = await fetch(url, {
       method: "GET",
       headers: {
@@ -149,7 +149,7 @@ const monoHeaders = (): Record<string, string> =>
 /** Fetch identities for a linked Mono account. */
 export async function getIdentities(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/identity`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/accounts/${encodeURIComponent(accountId)}/identity`;
     const res = await fetch(url, { method: "GET", headers: monoHeaders() });
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) return { ok: false, message: (data.message as string) ?? "Identities fetch failed" };
@@ -165,7 +165,7 @@ export async function updateCustomer(
   payload: { identity?: { type: string; number: string }; address?: unknown; phone?: string }
 ): Promise<{ ok: boolean; message?: string }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/customer`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/accounts/${encodeURIComponent(accountId)}/customer`;
     const res = await fetch(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...monoHeaders() },
@@ -184,7 +184,7 @@ export async function updateCustomer(
 /** Fetch income for a linked Mono account. */
 export async function getIncome(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/income`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/accounts/${encodeURIComponent(accountId)}/income`;
     const res = await fetch(url, { method: "GET", headers: monoHeaders() });
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) return { ok: false, message: (data.message as string) ?? "Income fetch failed" };
@@ -197,8 +197,10 @@ export async function getIncome(accountId: string): Promise<{ ok: boolean; data?
 /** Fetch statement for a linked Mono account. */
 export async function getStatement(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}/statement`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/accounts/${encodeURIComponent(accountId)}/statement`;
     const res = await fetch(url, { method: "GET", headers: monoHeaders() });
+    console.log(res);
+    
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) return { ok: false, message: (data.message as string) ?? "Statement fetch failed" };
     return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
@@ -210,7 +212,7 @@ export async function getStatement(accountId: string): Promise<{ ok: boolean; da
 /** Fetch details for a linked Mono account. */
 export async function getDetails(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(accountId)}`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/accounts/${encodeURIComponent(accountId)}`;
     const res = await fetch(url, { method: "GET", headers: monoHeaders() });
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) return { ok: false, message: (data.message as string) ?? "Details fetch failed" };
@@ -223,7 +225,7 @@ export async function getDetails(accountId: string): Promise<{ ok: boolean; data
 /** Verify address via third-party (Mono lookup). */
 export async function verifyAddress(address: Record<string, unknown>): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/address`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/address`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...monoHeaders() },
@@ -245,7 +247,7 @@ export async function getCreditHistoryByBvn(bvn: string): Promise<{
   message?: string;
 }> {
   try {
-    const url = `${env.monoApiUrl.replace(/\/$/, "")}/lookup/credit-history/all`;
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/credit-history/all`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -273,7 +275,7 @@ export async function initiateBvn(
   bvn: string,
   scope: string
 ): Promise<Record<string, unknown>> {
-  const url = "https://api.withmono.com/v2/lookup/bvn/initiate";
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}}/v3/lookup/bvn/initiate`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -292,7 +294,7 @@ export async function sendBvnOtp(
   monoSessionId: string,
   method: string
 ): Promise<Record<string, unknown>> {
-  const url = "https://api.withmono.com/v2/lookup/bvn/verify";
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}}/v3/lookup/bvn/verify`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -327,7 +329,7 @@ export async function createMonoCustomer(payload: {
   address?: string | null;
   phone?: string | null;
 }): Promise<Record<string, unknown>> {
-  const url = "https://api.withmono.com/v2/customers";
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/customers`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -353,7 +355,7 @@ export async function fetchBvnDetails(
   otp: string,
   monoSessionId: string
 ): Promise<Record<string, unknown>> {
-  const url = "https://api.withmono.com/v2/lookup/bvn/details";
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/lookup/bvn/details`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -379,7 +381,7 @@ export async function createPaymentMandate(payload: {
   reference: string;
   description?: string;
 }): Promise<Record<string, unknown>> {
-  const url = "https://api.withmono.com/v3/payments/mandates";
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/payments/mandates`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
