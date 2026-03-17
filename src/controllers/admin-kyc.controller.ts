@@ -1,31 +1,32 @@
 import { Context } from "hono";
 import { AdminKycService } from "../services/admin-kyc.service.js";
-import type { KycRecordStatus } from "../models/user-kyc-data.model.js";
+import { KycStatus } from "../models/enums.js";
 
-const VALID_STATUSES = new Set<KycRecordStatus>(["PENDING", "SUBMITTED", "RESUBMITTED"]);
+const VALID_USER_KYC_STATUSES = new Set<string>(Object.values(KycStatus));
 
-function parseStatus(value: string | undefined): KycRecordStatus | undefined {
+/** Query `status` maps to users.kycStatus (User table). Omit to list all KYC records. */
+function parseUserKycStatus(value: string | undefined): KycStatus | undefined {
   if (!value?.trim()) return undefined;
-  const s = value.toUpperCase() as KycRecordStatus;
-  return VALID_STATUSES.has(s) ? s : undefined;
+  const s = value.trim().toUpperCase();
+  return VALID_USER_KYC_STATUSES.has(s) ? (s as KycStatus) : undefined;
 }
 
 export class AdminKycController {
   constructor(private readonly adminKycService: AdminKycService) {}
 
   async getKycCount(c: Context): Promise<Response> {
-    const status = parseStatus(c.req.query("status"));
+    const status = parseUserKycStatus(c.req.query("status"));
     const search = c.req.query("search")?.trim();
     const data = await this.adminKycService.getKycCount(status, search);
     return c.json(data);
   }
 
   async getKycList(c: Context): Promise<Response> {
-    const status = parseStatus(c.req.query("status"));
+    const status = parseUserKycStatus(c.req.query("status"));
     const search = c.req.query("search")?.trim();
     const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
     const offset = Math.max(0, Number(c.req.query("offset")) || 0);
-    const data = await this.adminKycService.getKycList({ status, search, limit, offset });
+    const data = await this.adminKycService.getKycList({ userKycStatus: status, search, limit, offset });
     return c.json(data);
   }
 

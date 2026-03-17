@@ -202,7 +202,7 @@ export async function getStatement(accountId: string): Promise<{ ok: boolean; da
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) return { ok: false, message: (data.message as string) ?? "Statement fetch failed" };
     return { ok: true, data: (data.data as Record<string, unknown>) ?? data };
-  } catch (e) {
+  } catch (e) {    
     return { ok: false, message: e instanceof Error ? e.message : "Statement request failed" };
   }
 }

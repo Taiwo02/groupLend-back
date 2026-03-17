@@ -1606,8 +1606,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Count KYC in queue",
-        "description": "Count all KYC where status is PENDING, SUBMITTED, or RESUBMITTED. Optionally filter by status or search (fullName, email).",
+        "summary": "Count KYC records",
+        "description": "Count user_kyc_data rows. Omit query params to count all. Optional `status` filters by users.kycStatus (User table). Optional `search` by user fullName or email.",
         "security": [
           {
             "bearerAuth": []
@@ -1618,8 +1618,8 @@
             "name": "status",
             "in": "query",
             "required": false,
-            "description": "Filter by single status (PENDING, SUBMITTED, or RESUBMITTED)",
-            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED"] }
+            "description": "Filter by users.kycStatus (PENDING, SUBMITTED, RESUBMITTED, FLAGGED, APPROVED, REJECTED)",
+            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED", "FLAGGED", "APPROVED", "REJECTED"] }
           },
           {
             "name": "search",
@@ -1652,8 +1652,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "List KYC in queue",
-        "description": "Fetch all KYC where status is PENDING, SUBMITTED, or RESUBMITTED. Optionally filter by status (if sent from front-end) or search by fullName/email.",
+        "summary": "List KYC records",
+        "description": "Returns all user_kyc_data rows when no filters. Optional `status` filters by users.kycStatus. Optional `search` by user fullName or email.",
         "security": [
           {
             "bearerAuth": []
@@ -1664,8 +1664,8 @@
             "name": "status",
             "in": "query",
             "required": false,
-            "description": "Filter by single status (PENDING, SUBMITTED, or RESUBMITTED); if omitted, returns all three",
-            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED"] }
+            "description": "Filter by users.kycStatus; omit to return all KYC records",
+            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED", "FLAGGED", "APPROVED", "REJECTED"] }
           },
           {
             "name": "search",
@@ -1706,6 +1706,7 @@
                           "userId": { "type": "string", "format": "uuid" },
                           "fullName": { "type": "string" },
                           "email": { "type": "string" },
+                          "kycStatus": { "type": "string", "description": "users.kycStatus" },
                           "type": { "type": "string", "enum": ["Individual", "Group Member"] },
                           "submissionDate": { "type": "string", "format": "date-time" },
                           "documentStatus": { "type": "array", "items": { "type": "string" } },

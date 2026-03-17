@@ -1,14 +1,13 @@
 import { Op } from "sequelize";
 import { Transaction } from "sequelize";
 import { UserKycData } from "../models/index.js";
+import type { KycStatus } from "../models/enums.js";
 import type {
   BioDataPayload,
   ContactPayload,
   EmploymentDetailsPayload,
   KycRecordStatus
 } from "../models/user-kyc-data.model.js";
-
-const QUEUE_STATUSES: KycRecordStatus[] = ["PENDING", "SUBMITTED", "RESUBMITTED"];
 
 export class UserKycDataDao {
   findById(id: string, transaction?: Transaction): Promise<UserKycData | null> {
@@ -95,23 +94,38 @@ export class UserKycDataDao {
     );
   }
 
-  /** Admin list: KYC records with status in queue, optional filter and search. */
+  /**
+   * Admin list: all user_kyc_data rows by default.
+   * Optional `userKycStatus` filters by users.kycStatus (User table).
+   * Optional `search` filters by user fullName/email.
+   */
   async findForAdminList(
-    opts: { status?: KycRecordStatus; search?: string; limit?: number; offset?: number } = {},
+    opts: {
+      userKycStatus?: KycStatus;
+      search?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
     transaction?: Transaction
   ): Promise<UserKycData[]> {
-    const statusFilter = opts.status ?? { [Op.in]: QUEUE_STATUSES };
-    const where: Record<string, unknown> = { status: statusFilter };
-    if (opts.search?.trim()) {
+    const where: Record<string, unknown> = {};
+    if (opts.userKycStatus != null || opts.search?.trim()) {
+      const userWhere: Record<string, unknown> = {};
+      if (opts.userKycStatus != null) {
+        userWhere.kycStatus = opts.userKycStatus;
+      }
+      if (opts.search?.trim()) {
+        const q = opts.search.trim();
+        userWhere[Op.or] = [
+          { fullName: { [Op.iLike]: `%${q}%` } },
+          { email: { [Op.iLike]: `%${q}%` } }
+        ];
+      }
       const { User } = await import("../models/index.js");
       const users = await User.findAll({
-        where: {
-          [Op.or]: [
-            { fullName: { [Op.iLike]: `%${opts.search.trim()}%` } },
-            { email: { [Op.iLike]: `%${opts.search.trim()}%` } }
-          ]
-        },
-        attributes: ["id"]
+        where: userWhere,
+        attributes: ["id"],
+        transaction
       });
       const userIds = users.map((u) => u.id);
       if (userIds.length === 0) return [];
@@ -127,21 +141,27 @@ export class UserKycDataDao {
   }
 
   async countForAdminList(
-    opts: { status?: KycRecordStatus; search?: string } = {},
+    opts: { userKycStatus?: KycStatus; search?: string } = {},
     transaction?: Transaction
   ): Promise<number> {
-    const statusFilter = opts.status ?? { [Op.in]: QUEUE_STATUSES };
-    const where: Record<string, unknown> = { status: statusFilter };
-    if (opts.search?.trim()) {
+    const where: Record<string, unknown> = {};
+    if (opts.userKycStatus != null || opts.search?.trim()) {
+      const userWhere: Record<string, unknown> = {};
+      if (opts.userKycStatus != null) {
+        userWhere.kycStatus = opts.userKycStatus;
+      }
+      if (opts.search?.trim()) {
+        const q = opts.search.trim();
+        userWhere[Op.or] = [
+          { fullName: { [Op.iLike]: `%${q}%` } },
+          { email: { [Op.iLike]: `%${q}%` } }
+        ];
+      }
       const { User } = await import("../models/index.js");
       const users = await User.findAll({
-        where: {
-          [Op.or]: [
-            { fullName: { [Op.iLike]: `%${opts.search.trim()}%` } },
-            { email: { [Op.iLike]: `%${opts.search.trim()}%` } }
-          ]
-        },
-        attributes: ["id"]
+        where: userWhere,
+        attributes: ["id"],
+        transaction
       });
       const userIds = users.map((u) => u.id);
       if (userIds.length === 0) return 0;

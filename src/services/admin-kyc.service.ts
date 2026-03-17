@@ -4,7 +4,6 @@ import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
 import { KycStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
-import type { KycRecordStatus } from "../models/user-kyc-data.model.js";
 import { decryptBvn } from "../utils/encryption.js";
 import {
   lookupNin,
@@ -27,6 +26,8 @@ export type AdminKycListItem = {
   userId: string;
   fullName: string;
   email: string;
+  /** User's KYC status (users.kycStatus). */
+  kycStatus: string;
   type: "Individual" | "Group Member";
   submissionDate: string;
   documentStatus: string[];
@@ -76,27 +77,27 @@ export class AdminKycService {
     private readonly statementDao: StatementDao
   ) {}
 
-  /** Count KYC records where status in (PENDING, SUBMITTED, RESUBMITTED). Optional status or search filter. */
-  async getKycCount(status?: KycRecordStatus, search?: string): Promise<AdminKycCountResult> {
-    const count = await this.userKycDataDao.countForAdminList({ status, search });
+  /** Count KYC records. Optional users.kycStatus filter and search. No filter = all records. */
+  async getKycCount(userKycStatus?: KycStatus, search?: string): Promise<AdminKycCountResult> {
+    const count = await this.userKycDataDao.countForAdminList({ userKycStatus, search });
     return { count };
   }
 
-  /** Fetch KYC list (by kycId). Optional status filter or search. */
+  /** Fetch KYC list. Optional `status` query = users.kycStatus; omit for all KYC records. */
   async getKycList(opts: {
-    status?: KycRecordStatus;
+    userKycStatus?: KycStatus;
     search?: string;
     limit?: number;
     offset?: number;
   }): Promise<AdminKycListResult> {
     const [records, total] = await Promise.all([
       this.userKycDataDao.findForAdminList({
-        status: opts.status,
+        userKycStatus: opts.userKycStatus,
         search: opts.search,
         limit: opts.limit ?? 50,
         offset: opts.offset ?? 0
       }),
-      this.userKycDataDao.countForAdminList({ status: opts.status, search: opts.search })
+      this.userKycDataDao.countForAdminList({ userKycStatus: opts.userKycStatus, search: opts.search })
     ]);
     if (records.length === 0) return { count: total, items: [] };
 
@@ -124,6 +125,7 @@ export class AdminKycService {
         userId: rec.userId,
         fullName: u?.fullName ?? "Unknown",
         email: u?.email ?? "",
+        kycStatus: u?.kycStatus ?? "PENDING",
         type: "Individual",
         submissionDate: rec.submittedAt ? rec.submittedAt.toISOString() : rec.createdAt.toISOString(),
         documentStatus: docStatus,
@@ -254,9 +256,12 @@ export class AdminKycService {
     if (hasData && existing!.statement) {
       return { statement: existing!.statement as Record<string, unknown>, fromCache: true };
     }
+    
     const accountId = existing?.accountId ?? (existing?.extraData as Record<string, unknown> | undefined)?.accountId as string | undefined;
     if (!accountId) throw new HttpError(400, "No linked account to fetch statement");
     const result = await monoGetStatement(accountId);
+    console.log(result);
+    
     if (!result.ok || result.data == null) throw new HttpError(502, result.message ?? "Failed to fetch statement");
     await this.statementDao.createOrUpdate(record.userId, { statement: result.data });
     return { statement: result.data, fromCache: false };
