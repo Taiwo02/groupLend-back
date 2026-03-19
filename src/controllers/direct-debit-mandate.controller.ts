@@ -5,6 +5,7 @@ import { z } from "zod";
 
 const groupIdParamSchema = z.object({ groupId: z.string().uuid() });
 const mandateIdParamSchema = z.object({ mandateId: z.string().uuid() });
+const accountIdParamSchema = z.object({ accountId: z.string().uuid() });
 const authorizeBodySchema = z.object({ resend: z.boolean().optional().default(false) });
 const confirmBodySchema = z.object({
   otp: z.string().min(1, "OTP is required")
@@ -58,5 +59,26 @@ export class DirectDebitMandateController {
     const userId = c.get("userId");
     const mandate = await this.directDebitMandateService.confirmWithOtp(mandateId, userId, otp);
     return c.json({ mandate: { id: mandate.id, groupId: mandate.groupId, status: mandate.status, createdAt: mandate.createdAt.toISOString() } });
+  }
+
+  /** POST .../accounts/:accountId — get or refresh Mono payment mandate (3h cache on reference). */
+  async getOrRefreshAccountMandate(c: Context): Promise<Response> {
+    const groupId = parseWithSchema(groupIdParamSchema, { groupId: c.req.param("groupId") }).groupId;
+    const accountId = parseWithSchema(accountIdParamSchema, { accountId: c.req.param("accountId") }).accountId;
+    const userId = c.get("userId");
+    const result = await this.directDebitMandateService.getOrRefreshAccountMandate(userId, groupId, accountId);
+    return c.json(result);
+  }
+
+  /** POST .../accounts/:accountId/verify — poll Mono; activate account when approved. */
+  async verifyAccountMandate(c: Context): Promise<Response> {
+    const groupId = parseWithSchema(groupIdParamSchema, { groupId: c.req.param("groupId") }).groupId;
+    const accountId = parseWithSchema(accountIdParamSchema, { accountId: c.req.param("accountId") }).accountId;
+    const userId = c.get("userId");
+    const result = await this.directDebitMandateService.verifyAccountMandate(userId, groupId, accountId);
+    if (result.data === null) {
+      return c.json({ message: result.message, data: null }, 400);
+    }
+    return c.json({ message: result.message, data: result.data });
   }
 }

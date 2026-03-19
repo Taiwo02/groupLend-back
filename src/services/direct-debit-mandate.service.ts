@@ -8,7 +8,7 @@ import { MandateDao } from "../dao/mandate.dao.js";
 import { MemberMandateDao } from "../dao/member-mandate.dao.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
-import { DirectDebitMandate } from "../models/index.js";
+import { Account, DirectDebitMandate, Mandate } from "../models/index.js";
 import { AccountStatus, GroupMemberStatus, MandateStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { decryptBvn } from "../utils/encryption.js";
@@ -18,13 +18,15 @@ import {
   filterBvnMethod,
   createMonoCustomer,
   fetchBvnDetails,
-  createPaymentMandate
+  createPaymentMandate,
+  retrievePaymentMandate
 } from "./mono.client.js";
 
 const RESEND_THROTTLE_HOURS = 3;
 const DEFAULT_MAX_DEBIT_AMOUNT_NGN = 1_000_000;
 const MANDATE_AMOUNT_BUFFER_RATIO = 1.3;
 const MANDATE_END_DAYS_EXTRA = 60;
+const ACCOUNT_MANDATE_REFRESH_HOURS = 3;
 
 export type GetMandateResult = {
   id: string;
@@ -332,8 +334,152 @@ export class DirectDebitMandateService {
       }
     }
 
-    const updated = await this.directDebitMandateDao.setActive(mandateId, transaction);
+    const updated = await this.directDebitMandateDao.setActive(mandateId, MandateStatus.INPROGRESS, transaction);
     return updated!;
+  }
+
+  /**
+   * Return linked debit account if mandate reference is fresh (&lt; 3h) or account is ACTIVE;
+   * otherwise re-initiate Mono payment mandate and persist new reference.
+   */
+  async getOrRefreshAccountMandate(
+    userId: string,
+    groupId: string,
+    accountId: string
+  ): Promise<{ message: string; account: Record<string, unknown> }> {
+    const membership = await this.groupMemberDao.findByGroupAndUser(groupId, userId);
+    if (!membership || membership.status !== GroupMemberStatus.ACTIVE) {
+      throw new HttpError(403, "Not an active member of this group");
+    }
+
+    const account = await this.accountDao.findByIdWithMandate(accountId);
+    if (!account) throw new HttpError(404, "Record not found");
+
+    const groupMandate = (account as Account & { mandate?: Mandate }).mandate;
+    if (!groupMandate || groupMandate.groupId !== groupId) {
+      throw new HttpError(403, "Account is not linked to this group");
+    }
+
+    if (!account.memberMandateId) throw new HttpError(403, "Invalid account");
+    const mm = await this.memberMandateDao.findById(account.memberMandateId);
+    if (!mm || mm.userId !== userId) throw new HttpError(403, "Not your account");
+
+    const maxAgeMs = ACCOUNT_MANDATE_REFRESH_HOURS * 60 * 60 * 1000;
+    const createdAt = new Date(account.createdAt).getTime();
+    const referenceFresh = !!account.reference && Date.now() - createdAt < maxAgeMs;
+
+    if (account.status === AccountStatus.ACTIVE || referenceFresh) {
+      return {
+        message: "Record",
+        account: DirectDebitMandateService.serializeDebitAccount(account)
+      };
+    }
+
+    if (!account.monoCustomerId || !account.accountNumber || !account.bankCode) {
+      throw new HttpError(
+        400,
+        "Account is missing bank link details; complete direct-debit confirmation first"
+      );
+    }
+
+    const amountNgn =
+      DirectDebitMandateService.toPositiveNgn(groupMandate.totalAccessAmount) ||
+      DEFAULT_MAX_DEBIT_AMOUNT_NGN;
+    const amountKobo = Math.round(amountNgn * MANDATE_AMOUNT_BUFFER_RATIO * 100);
+    const startDate = formatDate(groupMandate.startDate);
+    const endExtra = new Date(groupMandate.endDate);
+    endExtra.setDate(endExtra.getDate() + MANDATE_END_DAYS_EXTRA);
+    const endDate = formatDate(endExtra);
+    const reference = "MONO" + randomBytes(8).toString("hex");
+
+    const mandateRes = await createPaymentMandate({
+      monoCustomerId: account.monoCustomerId,
+      accountNumber: account.accountNumber,
+      bankCode: account.bankCode,
+      amountKobo,
+      startDate,
+      endDate,
+      reference,
+      description: "Credit repayment"
+    });
+
+    if ((mandateRes.status as string) !== "successful") {
+      throw new HttpError(400, (mandateRes.message as string) ?? "Failed to initiate mandate");
+    }
+
+    const resData = (mandateRes.data as Record<string, unknown>) ?? {};
+    const newRef = (resData.reference as string) || reference;
+    await this.accountDao.updateMandateInitiation(accountId, {
+      reference: newRef,
+      initiateMandateData: { ...resData, ...mandateRes }
+    });
+
+    const refreshed = await this.accountDao.findById(accountId);
+    if (!refreshed) throw new HttpError(500, "Account not found after update");
+    return {
+      message: "Record fetched",
+      account: DirectDebitMandateService.serializeDebitAccount(refreshed)
+    };
+  }
+
+  /** Poll Mono for mandate approval; marks account ACTIVE when approved. */
+  async verifyAccountMandate(
+    userId: string,
+    groupId: string,
+    accountId: string
+  ): Promise<{ message: string; data: Record<string, unknown> | null }> {
+    const membership = await this.groupMemberDao.findByGroupAndUser(groupId, userId);
+    if (!membership || membership.status !== GroupMemberStatus.ACTIVE) {
+      throw new HttpError(403, "Not an active member of this group");
+    }
+
+    const account = await this.accountDao.findByIdWithMandate(accountId);
+    if (!account) throw new HttpError(404, "Record not found");
+
+    const groupMandate = (account as Account & { mandate?: Mandate }).mandate;
+    if (!groupMandate || groupMandate.groupId !== groupId) {
+      throw new HttpError(403, "Account is not linked to this group");
+    }
+
+    if (!account.memberMandateId) throw new HttpError(403, "Invalid account");
+    const mm = await this.memberMandateDao.findById(account.memberMandateId);
+    if (!mm || mm.userId !== userId) throw new HttpError(403, "Not your account");
+
+    if (!account.reference?.trim()) {
+      throw new HttpError(400, "No mandate reference; call refresh mandate first");
+    }
+
+    const remote = await retrievePaymentMandate(account.reference);
+    if (!remote) throw new HttpError(502, "Could not verify mandate with payment provider");
+
+    const approved =
+      remote.approved === true ||
+      remote.approved === "true" ||
+      String(remote.status ?? "").toLowerCase() === "approved";
+
+    if (!approved) {
+      return { message: "Mandate pending approval", data: null };
+    }
+
+    await this.accountDao.updateStatus(accountId, AccountStatus.ACTIVE);
+
+    return { message: "Mandate approved", data: remote };
+  }
+
+  private static serializeDebitAccount(account: Account): Record<string, unknown> {
+    return {
+      id: account.id,
+      mandateId: account.mandateId,
+      memberMandateId: account.memberMandateId,
+      reference: account.reference,
+      monoCustomerId: account.monoCustomerId,
+      accountNumber: account.accountNumber,
+      bankCode: account.bankCode,
+      status: account.status,
+      initiateMandateData: account.initiateMandateData,
+      createdAt: account.createdAt?.toISOString?.() ?? null,
+      updatedAt: account.updatedAt?.toISOString?.() ?? null
+    };
   }
 
   /** Confirm mandate as ACTIVE (simple; use confirmWithOtp for full OTP + accounts flow). */
@@ -344,7 +490,7 @@ export class DirectDebitMandateService {
     if (mandate.status !== MandateStatus.INACTIVE) {
       throw new HttpError(400, "Mandate is not pending confirmation");
     }
-    const updated = await this.directDebitMandateDao.setActive(mandateId, transaction);
+    const updated = await this.directDebitMandateDao.setActive(mandateId, MandateStatus.COMPLETED, transaction);
     return updated!;
   }
 

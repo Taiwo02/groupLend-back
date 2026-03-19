@@ -14,7 +14,15 @@ export function createGroupRoutes(
   routes.post("/:groupId/direct-debit-mandate", (c) =>
     directDebitMandateController.createAndAuthorizeMandate(c)
   );
-  routes.post("/:groupId/direct-debit-mandate/:mandateId/confirm", (c) => directDebitMandateController.confirmMandate(c));
+  routes.post("/:groupId/direct-debit-mandate/accounts/:accountId/verify", (c) =>
+    directDebitMandateController.verifyAccountMandate(c)
+  );
+  routes.post("/:groupId/direct-debit-mandate/accounts/:accountId", (c) =>
+    directDebitMandateController.getOrRefreshAccountMandate(c)
+  );
+  routes.post("/:groupId/direct-debit-mandate/:mandateId/confirm", (c) =>
+    directDebitMandateController.confirmMandate(c)
+  );
   routes.post("/:id/invite", (c) => groupController.inviteMembers(c));
   routes.get("/:id", (c) => groupController.getGroup(c));
   routes.post("/:id/exit", (c) => groupController.requestExit(c));

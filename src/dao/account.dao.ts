@@ -1,5 +1,5 @@
 import { Transaction } from "sequelize";
-import { Account } from "../models/index.js";
+import { Account, Mandate } from "../models/index.js";
 import { AccountStatus } from "../models/enums.js";
 
 export class AccountDao {
@@ -32,6 +32,45 @@ export class AccountDao {
 
   findById(id: string, transaction?: Transaction): Promise<Account | null> {
     return Account.findByPk(id, { transaction });
+  }
+
+  findByIdWithMandate(id: string, transaction?: Transaction): Promise<Account | null> {
+    return Account.findByPk(id, {
+      include: [{ model: Mandate, as: "mandate", required: true }],
+      transaction
+    });
+  }
+
+  findAllByMandateId(mandateId: string, transaction?: Transaction): Promise<Account[]> {
+    return Account.findAll({ where: { mandateId }, transaction });
+  }
+
+  async updateMandateInitiation(
+    id: string,
+    fields: {
+      reference: string;
+      initiateMandateData: Record<string, unknown>;
+    },
+    transaction?: Transaction
+  ): Promise<void> {
+    const now = new Date();
+    await Account.update(
+      {
+        reference: fields.reference,
+        initiateMandateData: fields.initiateMandateData,
+        createdAt: now,
+        updatedAt: now
+      },
+      { where: { id }, transaction }
+    );
+  }
+
+  async updateStatus(
+    id: string,
+    status: AccountStatus,
+    transaction?: Transaction
+  ): Promise<void> {
+    await Account.update({ status, updatedAt: new Date() }, { where: { id }, transaction });
   }
 
   findActiveByMemberMandateId(

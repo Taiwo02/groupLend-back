@@ -143,9 +143,11 @@ export async function getBankList(): Promise<BankListResult> {
   }
 }
 
-const monoHeaders = (): Record<string, string> =>
+const monoLookupHeaders = (): Record<string, string> =>
   env.monoLookUpdId ? { accept: "application/json", "mono-sec-key": env.monoLookUpdId } : {};
 
+const monoHeaders = (): Record<string, string> =>
+  env.monoId ? { accept: "application/json", "mono-sec-key": env.monoId } : {};
 /** Fetch identities for a linked Mono account. */
 export async function getIdentities(accountId: string): Promise<{ ok: boolean; data?: Record<string, unknown>; message?: string }> {
   try {
@@ -228,7 +230,7 @@ export async function verifyAddress(address: Record<string, unknown>): Promise<{
     const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/address`;
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...monoHeaders() },
+      headers: { "Content-Type": "application/json", ...monoLookupHeaders() },
       body: JSON.stringify(address)
     });
     const data = (await res.json()) as Record<string, unknown>;
@@ -404,4 +406,24 @@ export async function createPaymentMandate(payload: {
   });
   const data = (await res.json()) as Record<string, unknown>;
   return data;
+}
+
+/** GET v3/payments/mandates/:id — mandate id/reference from create response. Uses env.monoId. */
+export async function retrievePaymentMandate(
+  mandateReference: string
+): Promise<Record<string, unknown> | null> {
+  const key = env.monoId?.trim();
+  if (!key) return null;
+  try {
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/payments/mandates/${encodeURIComponent(mandateReference.trim())}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { accept: "application/json", "mono-sec-key": key }
+    });
+    const body = (await res.json()) as Record<string, unknown>;
+    const data = body?.data as Record<string, unknown> | undefined;
+    return data ?? null;
+  } catch {
+    return null;
+  }
 }

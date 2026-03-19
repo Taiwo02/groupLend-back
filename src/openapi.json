@@ -2438,6 +2438,71 @@
         }
       }
     },
+    "/groups/{groupId}/direct-debit-mandate/accounts/{accountId}": {
+      "post": {
+        "operationId": "getOrRefreshDebitAccountMandate",
+        "tags": ["Groups"],
+        "summary": "Get or refresh Mono payment mandate for a linked account",
+        "description": "Returns the debit account if status is ACTIVE, or if a mandate reference exists and was created less than 3 hours ago. Otherwise calls Mono POST /v3/payments/mandates (same shape as confirm flow), updates reference and initiateMandateData, and resets the account createdAt window. Account must belong to the group and the current user. accountId is returned from confirm (saved Account id).",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "accountId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "account": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Mono initiate failed or account missing bank link" },
+          "403": { "description": "Not your account or wrong group" },
+          "404": { "description": "Account not found" }
+        }
+      }
+    },
+    "/groups/{groupId}/direct-debit-mandate/accounts/{accountId}/verify": {
+      "post": {
+        "operationId": "verifyDebitAccountMandate",
+        "tags": ["Groups"],
+        "summary": "Verify direct debit mandate status with Mono",
+        "description": "GET Mono v3/payments/mandates/{reference} using the account reference. If approved, sets the account status to ACTIVE. Returns 400 while mandate is still pending approval.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "accountId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandate approved; account marked active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "data": { "type": "object", "additionalProperties": true, "description": "Mono mandate payload" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Mandate pending approval or no reference" },
+          "403": { "description": "Not your account or wrong group" },
+          "404": { "description": "Account not found" },
+          "502": { "description": "Mono retrieve failed" }
+        }
+      }
+    },
     "/loans/individual": {
       "post": {
         "operationId": "requestIndividualLoan",
@@ -3123,6 +3188,23 @@
               ],
               "description": "Nested group details; includes runningMandate on GET /auth/profile"
             }
+          }
+        },
+        "DebitLinkedAccount": {
+          "type": "object",
+          "description": "Bank account linked for group-year direct debit (accounts table)",
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "mandateId": { "type": "string", "format": "uuid" },
+            "memberMandateId": { "type": "string", "format": "uuid", "nullable": true },
+            "reference": { "type": "string", "nullable": true },
+            "monoCustomerId": { "type": "string", "nullable": true },
+            "accountNumber": { "type": "string", "nullable": true },
+            "bankCode": { "type": "string", "nullable": true },
+            "status": { "type": "string" },
+            "initiateMandateData": { "type": "object", "additionalProperties": true },
+            "createdAt": { "type": "string", "format": "date-time", "nullable": true },
+            "updatedAt": { "type": "string", "format": "date-time", "nullable": true }
           }
         },
         "Loan": {

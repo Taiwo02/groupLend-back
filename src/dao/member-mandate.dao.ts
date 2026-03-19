@@ -3,6 +3,10 @@ import { MemberMandate } from "../models/index.js";
 import { MandateStatus } from "../models/enums.js";
 
 export class MemberMandateDao {
+  findById(id: string, transaction?: Transaction): Promise<MemberMandate | null> {
+    return MemberMandate.findByPk(id, { transaction });
+  }
+
   create(
     payload: { mandateId: string; userId: string; status?: MandateStatus },
     transaction?: Transaction

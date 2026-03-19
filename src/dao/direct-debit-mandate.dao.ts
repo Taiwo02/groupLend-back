@@ -93,10 +93,10 @@ export class DirectDebitMandateDao {
     if (m) await m.update(data, { transaction });
   }
 
-  async setActive(id: string, transaction?: Transaction): Promise<DirectDebitMandate | null> {
+  async setActive(id: string, status: MandateStatus, transaction?: Transaction): Promise<DirectDebitMandate | null> {
     const m = await DirectDebitMandate.findByPk(id, { transaction });
     if (!m) return null;
-    await m.update({ status: MandateStatus.ACTIVE }, { transaction });
+    await m.update({ status: status }, { transaction });
     return m;
   }
 }

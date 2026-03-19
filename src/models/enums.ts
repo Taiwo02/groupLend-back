@@ -45,7 +45,10 @@ export enum ApprovalDecision {
 export enum MandateStatus {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
-  FAILED = "FAILED"
+  FAILED = "FAILED",
+  INPROGRESS = "INPROGRESS",
+  COMPLETED = "COMPLETED",
+  CANCELED = "CANCELED"
 }
 
 /** Group-level mandate (yearly); status of the mandate period. */
