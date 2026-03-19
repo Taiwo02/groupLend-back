@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Transaction } from "sequelize";
 import { AccountDao } from "../dao/account.dao.js";
 import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao.js";
+import { GroupDao } from "../dao/group.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
 import { MandateDao } from "../dao/mandate.dao.js";
 import { MemberMandateDao } from "../dao/member-mandate.dao.js";
@@ -42,6 +43,7 @@ export class DirectDebitMandateService {
   constructor(
     private readonly directDebitMandateDao: DirectDebitMandateDao,
     private readonly groupMemberDao: GroupMemberDao,
+    private readonly groupDao: GroupDao,
     private readonly userDao: UserDao,
     private readonly userKycDataDao: UserKycDataDao,
     private readonly mandateDao: MandateDao,
@@ -84,6 +86,29 @@ export class DirectDebitMandateService {
       return existing;
     }
     return this.directDebitMandateDao.create({ userId, groupId }, transaction);
+  }
+
+  /**
+   * Ensures an INACTIVE mandate exists for the user+group, then initiates BVN flow and sends OTP (same as authorize).
+   * Use {@link authorizeMandate} only when you already have a mandate id.
+   */
+  async createAndAuthorizeMandate(
+    userId: string,
+    groupId: string,
+    resend: boolean,
+    transaction?: Transaction
+  ): Promise<{ mandate: GetMandateResult; authorize: AuthorizeMandateResult }> {
+    const mandate = await this.createMandate(userId, groupId, transaction);
+    const authorize = await this.authorizeMandate(mandate.id, userId, resend, transaction);
+    return {
+      mandate: {
+        id: mandate.id,
+        groupId: mandate.groupId ?? null,
+        status: mandate.status,
+        createdAt: mandate.createdAt.toISOString()
+      },
+      authorize
+    };
   }
 
   /**
@@ -189,7 +214,6 @@ export class DirectDebitMandateService {
     mandateId: string,
     userId: string,
     otp: string,
-    maxDebitAmountNgn: number | undefined,
     transaction?: Transaction
   ): Promise<DirectDebitMandate> {
     const mandate = await this.directDebitMandateDao.findById(mandateId, transaction);
@@ -263,7 +287,9 @@ export class DirectDebitMandateService {
       throw new HttpError(400, "No bank accounts returned from BVN lookup");
     }
 
-    const amountNgn = maxDebitAmountNgn ?? DEFAULT_MAX_DEBIT_AMOUNT_NGN;
+    const group = await this.groupDao.findById(groupId, transaction);
+    if (!group) throw new HttpError(404, "Group not found");
+    const amountNgn = this.resolveGroupMaxDebitNgn(group);
     const amountKobo = Math.round(amountNgn * MANDATE_AMOUNT_BUFFER_RATIO * 100);
     const startDate = formatDate(groupMandate.startDate);
     const endDateExtra = new Date(groupMandate.endDate);
@@ -320,6 +346,19 @@ export class DirectDebitMandateService {
     }
     const updated = await this.directDebitMandateDao.setActive(mandateId, transaction);
     return updated!;
+  }
+
+  /** Max direct-debit coverage from group credit: higher of pool and target, else default. */
+  private resolveGroupMaxDebitNgn(group: { currentCreditPool: unknown; targetCredit: unknown }): number {
+    const pool = DirectDebitMandateService.toPositiveNgn(group.currentCreditPool);
+    const target = DirectDebitMandateService.toPositiveNgn(group.targetCredit);
+    const max = Math.max(pool, target);
+    return max > 0 ? max : DEFAULT_MAX_DEBIT_AMOUNT_NGN;
+  }
+
+  private static toPositiveNgn(value: unknown): number {
+    const n = typeof value === "string" ? parseFloat(value) : Number(value);
+    return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
   private isWithinYear(date: Date): boolean {

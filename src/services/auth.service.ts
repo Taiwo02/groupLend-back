@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto";
+import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao.js";
 import { GroupDao } from "../dao/group.dao.js";
 import { GroupInviteDao } from "../dao/group-invite.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
 import { UserDao } from "../dao/user.dao.js";
-import { User } from "../models/index.js";
+import { Group, GroupMember, User } from "../models/index.js";
 import { CreditStatus, KycStatus } from "../models/enums.js";
 import { GroupMemberRole, GroupMemberStatus } from "../models/enums.js";
 import { compareHash, hashValue, signJwt } from "../utils/auth.js";
@@ -41,7 +42,8 @@ export class AuthService {
     private readonly groupMemberDao: GroupMemberDao,
     private readonly groupInviteDao: GroupInviteDao,
     private readonly groupDao: GroupDao,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly directDebitMandateDao: DirectDebitMandateDao
   ) {}
 
   async signup(input: SignupInput): Promise<{
@@ -144,6 +146,23 @@ export class AuthService {
   async getProfile(userId: string): Promise<User> {
     const user = await this.userDao.findById(userId);
     if (!user) throw new HttpError(404, "User not found");
+
+    type Row = GroupMember & { group?: Group };
+    const memberships = (user as User & { groups?: Row[] }).groups ?? [];
+    const groupIds = memberships
+      .map((m) => m.group?.id)
+      .filter((id): id is string => id != null);
+    const runningGroupIds =
+      await this.directDebitMandateDao.findRunningMandateGroupIdsForUser(userId, groupIds);
+    for (const m of memberships) {
+      const grp = m.group;
+      if (!grp?.id) continue;
+      (grp as unknown as { setDataValue: (k: string, v: boolean) => void }).setDataValue(
+        "runningMandate",
+        runningGroupIds.has(grp.id)
+      );
+    }
+
     return user;
   }
 

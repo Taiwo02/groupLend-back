@@ -11,8 +11,9 @@ export function createGroupRoutes(
   routes.use("*", requireAuth);
   routes.post("/", (c) => groupController.createGroup(c));
   routes.get("/:groupId/direct-debit-mandate", (c) => directDebitMandateController.getMandate(c));
-  routes.post("/:groupId/direct-debit-mandate", (c) => directDebitMandateController.createMandate(c));
-  routes.post("/:groupId/direct-debit-mandate/:mandateId/authorize", (c) => directDebitMandateController.authorizeMandate(c));
+  routes.post("/:groupId/direct-debit-mandate", (c) =>
+    directDebitMandateController.createAndAuthorizeMandate(c)
+  );
   routes.post("/:groupId/direct-debit-mandate/:mandateId/confirm", (c) => directDebitMandateController.confirmMandate(c));
   routes.post("/:id/invite", (c) => groupController.inviteMembers(c));
   routes.get("/:id", (c) => groupController.getGroup(c));

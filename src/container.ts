@@ -78,7 +78,8 @@ function createContainer() {
     groupMemberDao,
     groupInviteDao,
     groupDao,
-    emailService
+    emailService,
+    directDebitMandateDao
   );
   const loanService = new LoanService(
     dbDao,
@@ -119,6 +120,7 @@ function createContainer() {
   const directDebitMandateService = new DirectDebitMandateService(
     directDebitMandateDao,
     groupMemberDao,
+    groupDao,
     userDao,
     userKycDataDao,
     mandateDao,

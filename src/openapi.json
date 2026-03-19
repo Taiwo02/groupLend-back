@@ -2333,51 +2333,13 @@
         }
       },
       "post": {
-        "operationId": "createDirectDebitMandate",
+        "operationId": "createAndAuthorizeDirectDebitMandate",
         "tags": ["Groups"],
-        "summary": "Create direct debit mandate for a group",
-        "description": "Create a direct debit mandate for the current user and group (status INACTIVE). User must be an active member. Only one mandate per user per group; if one already exists it is returned. After creation, use authorize then confirm to activate.",
+        "summary": "Create mandate (if needed) and send BVN OTP",
+        "description": "Ensures a direct debit mandate exists for the user and group (creates INACTIVE if none), then initiates Mono BVN verification and sends OTP to phone or email. Use mandate.id with the confirm endpoint. Optional body: { \"resend\": true } to count as resend (throttled once per 3 hours).",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
-        ],
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "mandate": {
-                      "type": "object",
-                      "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "groupId": { "type": "string", "format": "uuid", "nullable": true },
-                        "status": { "type": "string" },
-                        "createdAt": { "type": "string", "format": "date-time" }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": { "description": "Already have an active mandate for this group" },
-          "403": { "description": "Not an active member of this group" }
-        }
-      }
-    },
-    "/groups/{groupId}/direct-debit-mandate/{mandateId}/authorize": {
-      "post": {
-        "operationId": "authorizeDirectDebitMandate",
-        "tags": ["Groups"],
-        "summary": "Start or resend BVN authorization (send OTP)",
-        "description": "Initiates Mono BVN verification and sends OTP to the user's phone or email. Mandate must be INACTIVE. Uses BVN and contact from KYC. Resend is throttled to once per 3 hours. Body: { \"resend\": false }.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "mandateId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
         "requestBody": {
           "content": {
@@ -2391,12 +2353,21 @@
         },
         "responses": {
           "200": {
-            "description": "OTP sent",
+            "description": "OTP sent; mandate returned for confirm step",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "mandate": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "groupId": { "type": "string", "format": "uuid", "nullable": true },
+                        "status": { "type": "string" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                      }
+                    },
                     "ok": { "type": "boolean" },
                     "message": { "type": "string" },
                     "data": { "type": "object", "nullable": true, "properties": { "sessionId": { "type": "string" } } }
@@ -2406,10 +2377,9 @@
             }
           },
           "400": {
-            "description": "Mandate not INACTIVE, KYC/BVN missing, BVN init or OTP failed, or resend throttled (try again later)"
+            "description": "Already have an active mandate, KYC/BVN missing, BVN init or OTP failed, mandate not INACTIVE, or resend throttled"
           },
-          "403": { "description": "Not your mandate" },
-          "404": { "description": "Mandate not found" }
+          "403": { "description": "Not an active member of this group" }
         }
       }
     },
@@ -2418,7 +2388,7 @@
         "operationId": "confirmDirectDebitMandate",
         "tags": ["Groups"],
         "summary": "Confirm mandate with OTP and link accounts",
-        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. Creates or reuses Mono customer (mono_customer_id stored on user and mandate). Request body: otp (required), optional maxDebitAmount (NGN) for mandate amount.",
+        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. mandateId comes from POST /groups/{groupId}/direct-debit-mandate response. Mandate debit cap is derived server-side from the group (max of currentCreditPool and targetCredit; default 1,000,000 NGN if both are zero). Body: otp only.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
@@ -2432,8 +2402,7 @@
                 "type": "object",
                 "required": ["otp"],
                 "properties": {
-                  "otp": { "type": "string", "description": "OTP received from authorize step" },
-                  "maxDebitAmount": { "type": "number", "description": "Max debit amount in NGN (default 1,000,000)" }
+                  "otp": { "type": "string", "description": "OTP received after POST .../direct-debit-mandate" }
                 }
               }
             }
@@ -2708,7 +2677,7 @@
             }
           },
           "400": {
-            "description": "Loan not pending approval, already has a rejection, or approver must have an active direct debit mandate for this group (create/authorize mandate first)"
+            "description": "Loan not pending approval, already has a rejection, or approver must have an active direct debit mandate for this group (start mandate OTP flow then confirm first)"
           },
           "403": {
             "description": "Not an active group member, not eligible to approve this loan, or invalid loan PIN"
@@ -2960,6 +2929,13 @@
             "updatedAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "groups": {
+              "type": "array",
+              "description": "Group memberships (included on GET /auth/profile)",
+              "items": {
+                "$ref": "#/components/schemas/GroupMember"
+              }
             }
           }
         },
@@ -3093,6 +3069,10 @@
             "updatedAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "runningMandate": {
+              "type": "boolean",
+              "description": "On profile nested group: true if this user has an ACTIVE direct-debit mandate for this group within the last 12 months"
             }
           }
         },
@@ -3134,6 +3114,14 @@
             "updatedAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "group": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Group"
+                }
+              ],
+              "description": "Nested group details; includes runningMandate on GET /auth/profile"
             }
           }
         },
