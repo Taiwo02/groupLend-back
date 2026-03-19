@@ -277,7 +277,7 @@ export async function initiateBvn(
   bvn: string,
   scope: string
 ): Promise<Record<string, unknown>> {
-  const url = `${env.monoApiUrl.replace(/\/$/, "")}}/v3/lookup/bvn/initiate`;
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/bvn/initiate`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -296,7 +296,7 @@ export async function sendBvnOtp(
   monoSessionId: string,
   method: string
 ): Promise<Record<string, unknown>> {
-  const url = `${env.monoApiUrl.replace(/\/$/, "")}}/v3/lookup/bvn/verify`;
+  const url = `${env.monoApiUrl.replace(/\/$/, "")}/v3/lookup/bvn/verify`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
