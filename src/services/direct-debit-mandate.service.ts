@@ -217,7 +217,7 @@ export class DirectDebitMandateService {
     userId: string,
     otp: string,
     transaction?: Transaction
-  ): Promise<DirectDebitMandate> {
+  ): Promise<{ mandate: DirectDebitMandate; accounts: Account[] }> {
     const mandate = await this.directDebitMandateDao.findById(mandateId, transaction);
     if (!mandate) throw new HttpError(404, "Mandate not found");
     if (mandate.userId !== userId) throw new HttpError(403, "Not your mandate");
@@ -298,6 +298,7 @@ export class DirectDebitMandateService {
     endDateExtra.setDate(endDateExtra.getDate() + MANDATE_END_DAYS_EXTRA);
     const endDate = formatDate(endDateExtra);
 
+    const createdAccounts: Account[] = [];
     for (const item of accountsData) {
       const el = item as Record<string, unknown>;
       const accountNumber = el.account_number as string | undefined;
@@ -318,7 +319,7 @@ export class DirectDebitMandateService {
       const mandateStatus = mandateRes.status as string | undefined;
       if (mandateStatus === "successful") {
         const data = mandateRes.data as Record<string, unknown> | undefined;
-        await this.accountDao.create(
+        const row = await this.accountDao.create(
           {
             mandateId: groupMandate.id,
             memberMandateId: memberMandate.id,
@@ -331,11 +332,16 @@ export class DirectDebitMandateService {
           },
           transaction
         );
+        createdAccounts.push(row);
       }
     }
 
+    if (createdAccounts.length === 0) {
+      throw new HttpError(400, "No bank accounts could be linked; check Mono mandate responses");
+    }
+
     const updated = await this.directDebitMandateDao.setActive(mandateId, MandateStatus.INPROGRESS, transaction);
-    return updated!;
+    return { mandate: updated!, accounts: createdAccounts };
   }
 
   /**
@@ -466,7 +472,8 @@ export class DirectDebitMandateService {
     return { message: "Mandate approved", data: remote };
   }
 
-  private static serializeDebitAccount(account: Account): Record<string, unknown> {
+  /** JSON shape for linked debit accounts (confirm + refresh endpoints). */
+  static serializeDebitAccount(account: Account): Record<string, unknown> {
     return {
       id: account.id,
       mandateId: account.mandateId,

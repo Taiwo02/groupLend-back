@@ -57,8 +57,16 @@ export class DirectDebitMandateController {
     const body = await c.req.json().catch(() => ({})) as unknown;
     const { otp } = parseWithSchema(confirmBodySchema, body);
     const userId = c.get("userId");
-    const mandate = await this.directDebitMandateService.confirmWithOtp(mandateId, userId, otp);
-    return c.json({ mandate: { id: mandate.id, groupId: mandate.groupId, status: mandate.status, createdAt: mandate.createdAt.toISOString() } });
+    const { mandate, accounts } = await this.directDebitMandateService.confirmWithOtp(mandateId, userId, otp);
+    return c.json({
+      mandate: {
+        id: mandate.id,
+        groupId: mandate.groupId,
+        status: mandate.status,
+        createdAt: mandate.createdAt.toISOString()
+      },
+      accounts: accounts.map((a) => DirectDebitMandateService.serializeDebitAccount(a))
+    });
   }
 
   /** POST .../accounts/:accountId — get or refresh Mono payment mandate (3h cache on reference). */

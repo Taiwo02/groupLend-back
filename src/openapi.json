@@ -2388,7 +2388,7 @@
         "operationId": "confirmDirectDebitMandate",
         "tags": ["Groups"],
         "summary": "Confirm mandate with OTP and link accounts",
-        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. mandateId comes from POST /groups/{groupId}/direct-debit-mandate response. Mandate debit cap is derived server-side from the group (max of currentCreditPool and targetCredit; default 1,000,000 NGN if both are zero). Body: otp only.",
+        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. Response includes all successfully saved linked accounts (use account ids for refresh/verify). mandateId comes from POST /groups/{groupId}/direct-debit-mandate response. Mandate debit cap is derived server-side from the group (max of currentCreditPool and targetCredit; default 1,000,000 NGN if both are zero). Body: otp only.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
@@ -2424,6 +2424,11 @@
                         "status": { "type": "string" },
                         "createdAt": { "type": "string", "format": "date-time" }
                       }
+                    },
+                    "accounts": {
+                      "type": "array",
+                      "description": "All bank accounts successfully linked in this confirm call",
+                      "items": { "$ref": "#/components/schemas/DebitLinkedAccount" }
                     }
                   }
                 }
@@ -2431,7 +2436,7 @@
             }
           },
           "400": {
-            "description": "Mandate not pending, authorize first, invalid OTP, no accounts returned, or Mono customer/create failed"
+            "description": "Mandate not pending, authorize first, invalid OTP, no BVN accounts, no accounts could be linked via Mono, or Mono customer/create failed"
           },
           "403": { "description": "Not your mandate" },
           "404": { "description": "Mandate not found" }
