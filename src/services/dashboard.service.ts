@@ -171,7 +171,7 @@ export class DashboardService {
         this.getPendingApprovalsCount(userId),
         this.getPendingPeerApprovals(userId),
         this.getRecentActivity(userId),
-        groupIds.length > 0 ? this.getNonAcceptedMemberships(groupIds[0]) : Promise.resolve([])
+        groupIds.length > 0 ? this.getNonAcceptedMemberships(groupIds) : Promise.resolve([])
       ]);
 
     const allKycComplete = groupOnboarding ? groupOnboarding.creditStatus === "unlocked" : groupPoolStatus.length === 0;
@@ -220,13 +220,32 @@ export class DashboardService {
     };
   }
 
-  private async getNonAcceptedMemberships(groupId: string): Promise<NonAcceptedMembership[]> {
-    const invited = await this.groupMemberDao.findInvitedMembersByGroupId(groupId);
+  private async getNonAcceptedMemberships(groupIds: string[]): Promise<NonAcceptedMembership[]> {
+    const invitedByGroup = await Promise.all(
+      groupIds.map((groupId) => this.groupMemberDao.findPendingInvitedMembersByGroupId(groupId))
+    );
+    const invited = invitedByGroup.flat();
     if (invited.length === 0) return [];
-    const userIds = invited.map((m) => m.userId);
+
+    // De-dupe by userId because a user might appear in multiple groups; the payload doesn't include groupId.
+    const byUserId = new Map<string, (typeof invited)[number]>();
+    for (const m of invited) {
+      const existing = byUserId.get(m.userId);
+      if (!existing) {
+        byUserId.set(m.userId, m);
+        continue;
+      }
+      const existingTime = existing.createdAt ? existing.createdAt.getTime() : Number.POSITIVE_INFINITY;
+      const mTime = m.createdAt ? m.createdAt.getTime() : Number.POSITIVE_INFINITY;
+      if (mTime < existingTime) byUserId.set(m.userId, m);
+    }
+    const uniqueInvited = Array.from(byUserId.values());
+
+    const userIds = uniqueInvited.map((m) => m.userId);
     const users = await Promise.all(userIds.map((id) => this.userDao.findById(id)));
     const userMap = new Map(userIds.map((id, i) => [id, users[i]]));
-    return invited.map((m) => {
+
+    return uniqueInvited.map((m) => {
       const u = userMap.get(m.userId);
       return {
         userId: m.userId,

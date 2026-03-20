@@ -174,7 +174,7 @@ export class KycService {
         extraData: { account: payload.account },
         status: true
       });
-      await this.statementSyncService.saveStatementInfo(userId, payload.code, payload.code);
+      await this.statementSyncService.saveStatementInfo(userId, payload.code);
     } else if (payload.step === 2) {
       await this.userKycDataDao.upsert(userId, { employmentDetails: payload.employmentDetails });
       await this.userDao.updateKycStatus(userId, KycStatus.SUBMITTED);

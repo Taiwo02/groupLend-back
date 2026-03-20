@@ -161,6 +161,44 @@ export async function getIdentities(accountId: string): Promise<{ ok: boolean; d
   }
 }
 
+/**
+ * Exchange Mono Connect `code` for an account id/details.
+ * Mono endpoint: POST /v2/accounts/auth
+ */
+export async function getAccounId(code: string): Promise<string | null> {
+  try {
+    const key = env.monoId?.trim();
+    if (!key) return null;
+
+    const url = `${env.monoApiUrl.replace(/\/$/, "")}/v2/accounts/auth`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+        "mono-sec-key": key
+      },
+      body: JSON.stringify({ code })
+    });
+
+    const body = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) {
+      console.log(body);
+      return null;
+    }
+
+    const data = (body as { data?: unknown }).data;
+    if (data && typeof data === "object") {
+      const id = (data as { id?: unknown }).id ?? (data as any).account_id ?? (data as any).accountId;
+      return typeof id === "string" ? id : null;
+    }
+    return null;
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
+
 /** Update customer on Mono (identity, address, phone). */
 export async function updateCustomer(
   accountId: string,
