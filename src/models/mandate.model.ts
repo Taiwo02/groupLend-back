@@ -9,13 +9,16 @@ import { sequelize } from "../config/database.js";
 import { GroupMandateStatus } from "./enums.js";
 
 /**
- * Group-level mandate for a year. The group access amount (totalAccessAmount)
- * is the sum of 40% of each member's annual income for that year.
+ * Group-level mandate for a rolling period (start/end DATEONLY).
+ * The group access amount (totalAccessAmount) is the sum of 40% of each member's annual income.
  */
 export class Mandate extends Model<InferAttributes<Mandate>, InferCreationAttributes<Mandate>> {
   declare id: CreationOptional<string>;
   declare groupId: string;
-  /** Year this mandate covers (e.g. 2025). */
+  /**
+   * Period identifier for UNIQUE(groupId, year): encode period start as YYYYMMDD (e.g. 20260319).
+   * Not the calendar year alone — avoids unique conflicts when a new period starts in the same calendar year as an expired row.
+   */
   declare year: number;
   /** Total access amount = sum(40% of each member's annual income). */
   declare totalAccessAmount: number;

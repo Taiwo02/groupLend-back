@@ -23,6 +23,7 @@ import {
   RepaymentStatus
 } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
+import { addLocalDays, addLocalMonths, toLocalDateYmd } from "../utils/mandate-period.js";
 import { toNumber } from "../utils/number.js";
 import { EmailService } from "../email/email.service.js";
 import { NotificationService } from "./notification.service.js";
@@ -121,14 +122,10 @@ export class LoanService {
 
 
     return this.dbDao.withTransaction(async (transaction) => {
-      const currentYear = new Date().getFullYear();
-      let mandate = await this.mandateDao.findActiveByGroupAndYear(
-        input.groupId,
-        currentYear,
-        transaction
-      );
+      await this.mandateDao.expireMandatesPastEndDate(input.groupId, transaction);
+      let mandate = await this.mandateDao.findCurrentGroupMandate(input.groupId, transaction);
       if (!mandate) {
-        mandate = await this.ensureMandateForGroup(input.groupId, currentYear, transaction);
+        mandate = await this.ensureMandateForGroup(input.groupId, transaction);
       }
 
       const totalAccessAmount = toNumber(mandate.totalAccessAmount);
@@ -203,14 +200,11 @@ export class LoanService {
   }
 
   /**
-   * Get or create the active mandate for the group for the given year.
-   * Group access amount = sum of 40% of each member's annual income.
+   * Create a new group mandate period: starts local today + 25 days, ends 12 calendar months after start.
+   * `year` column = calendar year of period start (for legacy index UNIQUE(groupId, year)).
+   * Group access amount = sum of 40% of each member's annual income (unchanged formula).
    */
-  private async ensureMandateForGroup(
-    groupId: string,
-    year: number,
-    transaction: Transaction
-  ): Promise<Mandate> {
+  private async ensureMandateForGroup(groupId: string, transaction: Transaction): Promise<Mandate> {
     const activeMembers = await this.groupMemberDao.findActiveMembersByGroupId(groupId, transaction);
     const userIds = activeMembers.map((m) => m.userId);
     const users = await this.userDao.findByIdsWithKyc(userIds, transaction);
@@ -224,12 +218,15 @@ export class LoanService {
     }
     totalAccessAmount = Number(totalAccessAmount.toFixed(2));
 
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year, 11, 31);
+    const startDate = addLocalDays(new Date(), 25);
+    const endDate = addLocalMonths(startDate, 12);
+    const ymd = toLocalDateYmd(startDate).replace(/-/g, "");
+    const yearSlot = Number.parseInt(ymd, 10);
+
     const mandate = await this.mandateDao.create(
       {
         groupId,
-        year,
+        year: yearSlot,
         totalAccessAmount,
         startDate,
         endDate,

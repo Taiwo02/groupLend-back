@@ -131,12 +131,12 @@ export class DirectDebitMandateService {
       throw new HttpError(400, "You cannot re-authorize this mandate; it is already active or failed");
     }
 
-    if (mandate.lastResendAt) {
-      const hoursSince = (Date.now() - mandate.lastResendAt.getTime()) / (1000 * 60 * 60);
-      if (hoursSince < RESEND_THROTTLE_HOURS) {
-        throw new HttpError(400, "Please try again later", { hoursRemaining: Math.ceil(RESEND_THROTTLE_HOURS - hoursSince) });
-      }
-    }
+    // if (mandate.lastResendAt) {
+    //   const hoursSince = (Date.now() - mandate.lastResendAt.getTime()) / (1000 * 60 * 60);
+    //   if (hoursSince < RESEND_THROTTLE_HOURS) {
+    //     throw new HttpError(400, "Please try again later", { hoursRemaining: Math.ceil(RESEND_THROTTLE_HOURS - hoursSince) });
+    //   }
+    // }
 
     const kyc = await this.userKycDataDao.findByUserId(userId, transaction);
     const bvnEncrypted = kyc?.bvnEncrypted?.trim();
@@ -242,9 +242,9 @@ export class DirectDebitMandateService {
       throw new HttpError(400, "Could not use stored BVN");
     }
 
-    const currentYear = new Date().getFullYear();
-    const groupMandate = await this.mandateDao.findActiveByGroupAndYear(groupId, currentYear, transaction);
-    if (!groupMandate) throw new HttpError(400, "No active group mandate for this year");
+    await this.mandateDao.expireMandatesPastEndDate(groupId, transaction);
+    const groupMandate = await this.mandateDao.findCurrentGroupMandate(groupId, transaction);
+    if (!groupMandate) throw new HttpError(400, "No active group mandate for the current period");
     const memberMandate = await this.memberMandateDao.findByMandateAndUser(groupMandate.id, userId, transaction);
     if (!memberMandate) throw new HttpError(400, "You are not a member of this group mandate");
 
