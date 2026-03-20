@@ -153,7 +153,7 @@ Group.init(
     status: {
       type: DataTypes.STRING(20),
       allowNull: false,
-      defaultValue: GroupStatus.ACTIVE
+      defaultValue: GroupStatus.PENDING
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

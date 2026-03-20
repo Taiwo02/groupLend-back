@@ -117,6 +117,7 @@ export class LoanService {
     const isInstitutional =
       group.credibilityLevel === CredibilityLevel.VERIFIED_TRUST_GROUP && input.amount > currentPool;
 
+
     return this.dbDao.withTransaction(async (transaction) => {
       const currentYear = new Date().getFullYear();
       let mandate = await this.mandateDao.findActiveByGroupAndYear(
