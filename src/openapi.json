@@ -2383,6 +2383,37 @@
         }
       }
     },
+    "/groups/{groupId}/direct-debit-mandate/accounts": {
+      "get": {
+        "operationId": "listDirectDebitSavedAccounts",
+        "tags": ["Groups"],
+        "summary": "List saved direct-debit accounts for this group",
+        "description": "Returns bank accounts linked for the current user under the group's current lending mandate period (same shape as confirm response accounts). Empty array if there is no active mandate period, no member mandate, or no accounts saved yet. Requires active group membership.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accounts": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": { "description": "Not an active member of this group" }
+        }
+      }
+    },
     "/groups/{groupId}/direct-debit-mandate/{mandateId}/confirm": {
       "post": {
         "operationId": "confirmDirectDebitMandate",

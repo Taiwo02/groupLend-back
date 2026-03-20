@@ -53,6 +53,27 @@ export class DirectDebitMandateService {
     private readonly accountDao: AccountDao
   ) {}
 
+  /**
+   * List saved direct-debit accounts for the current user in the group (current group mandate period).
+   * Empty list if there is no active mandate period or no linked accounts yet.
+   */
+  async listSavedDebitAccounts(userId: string, groupId: string): Promise<Record<string, unknown>[]> {
+    const membership = await this.groupMemberDao.findByGroupAndUser(groupId, userId);
+    if (!membership || membership.status !== GroupMemberStatus.ACTIVE) {
+      throw new HttpError(403, "Not an active member of this group");
+    }
+
+    await this.mandateDao.expireMandatesPastEndDate(groupId);
+    const groupMandate = await this.mandateDao.findCurrentGroupMandate(groupId);
+    if (!groupMandate) return [];
+
+    const memberMandate = await this.memberMandateDao.findByMandateAndUser(groupMandate.id, userId);
+    if (!memberMandate) return [];
+
+    const rows = await this.accountDao.findByMemberMandateId(memberMandate.id);
+    return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a));
+  }
+
   /** Get current user's direct debit mandate for a group. Returns null if none. */
   async getMandateForUserAndGroup(
     userId: string,
@@ -131,12 +152,12 @@ export class DirectDebitMandateService {
       throw new HttpError(400, "You cannot re-authorize this mandate; it is already active or failed");
     }
 
-    // if (mandate.lastResendAt) {
-    //   const hoursSince = (Date.now() - mandate.lastResendAt.getTime()) / (1000 * 60 * 60);
-    //   if (hoursSince < RESEND_THROTTLE_HOURS) {
-    //     throw new HttpError(400, "Please try again later", { hoursRemaining: Math.ceil(RESEND_THROTTLE_HOURS - hoursSince) });
-    //   }
-    // }
+    if (mandate.lastResendAt) {
+      const hoursSince = (Date.now() - mandate.lastResendAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSince < RESEND_THROTTLE_HOURS) {
+        throw new HttpError(400, "Please try again later", { hoursRemaining: Math.ceil(RESEND_THROTTLE_HOURS - hoursSince) });
+      }
+    }
 
     const kyc = await this.userKycDataDao.findByUserId(userId, transaction);
     const bvnEncrypted = kyc?.bvnEncrypted?.trim();
@@ -173,7 +194,6 @@ export class DirectDebitMandateService {
         transaction
       );
     }
-    console.log("bvnEncrypted", data);
 
     const methods = (data?.methods as { method?: string }[] | undefined) ?? [];
     let filterMethod = filterBvnMethod(methods, "phone");

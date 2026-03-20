@@ -14,6 +14,14 @@ const confirmBodySchema = z.object({
 export class DirectDebitMandateController {
   constructor(private readonly directDebitMandateService: DirectDebitMandateService) {}
 
+  /** GET /groups/:groupId/direct-debit-mandate/accounts */
+  async listSavedAccounts(c: Context): Promise<Response> {
+    const params = parseWithSchema(groupIdParamSchema, { groupId: c.req.param("groupId") });
+    const userId = c.get("userId");
+    const accounts = await this.directDebitMandateService.listSavedDebitAccounts(userId, params.groupId);
+    return c.json({ accounts });
+  }
+
   /** GET /groups/:groupId/direct-debit-mandate */
   async getMandate(c: Context): Promise<Response> {
     const params = parseWithSchema(groupIdParamSchema, { groupId: c.req.param("groupId") });
