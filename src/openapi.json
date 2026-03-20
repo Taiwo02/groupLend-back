@@ -2577,7 +2577,7 @@
                   },
                   "loanPin": {
                     "type": "string",
-                    "pattern": "^\\d{6}$"
+                    "pattern": "^\\d{4}$"
                   },
                   "loanPurpose": {
                     "type": "string",
@@ -2619,10 +2619,19 @@
         "operationId": "listGroupLoans",
         "tags": ["Loans"],
         "summary": "List my group loans",
-        "description": "Returns loans where the authenticated user is the borrower and the loan is tied to a group (`groupId` is set). Each item may include a nested `group` object with `id` and `name`. Newest first.",
+        "description": "Returns all loans belonging to the authenticated user's active group(s). Use optional query param `status` to filter by loan outcome/status. Each item may include nested `group` and `borrower` objects. Newest first.",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Optional comma-separated loan statuses (e.g. APPROVED,ACTIVE).",
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
@@ -2688,7 +2697,7 @@
                   },
                   "loanPin": {
                     "type": "string",
-                    "pattern": "^\\d{6}$"
+                    "pattern": "^\\d{4}$"
                   },
                   "loanPurpose": {
                     "type": "string",
@@ -2775,7 +2784,7 @@
         "operationId": "approveLoan",
         "tags": ["Loans"],
         "summary": "Approve a group loan",
-        "description": "Record the caller's approval for a group loan. Only active group members can approve. For group loans, the approver must have an active direct debit mandate for the group (created and authorized within the last 12 months). If the approver has no running mandate, they must create and authorize direct debit on their account(s) before they can approve. Requires onboarding complete and request body with loanPin (6 digits). When all members have approved, the loan moves to APPROVED and is disbursed.",
+        "description": "Record the caller's approval for a group loan. Only active group members can approve. For group loans, the approver must have an active direct debit mandate for the group (created and authorized within the last 12 months). If the approver has no running mandate, they must create and authorize direct debit on their account(s) before they can approve. Requires onboarding complete and request body with loanPin (4 digits). When all members have approved, the loan moves to APPROVED and is disbursed.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           {
@@ -2793,7 +2802,7 @@
                 "type": "object",
                 "required": ["loanPin"],
                 "properties": {
-                  "loanPin": { "type": "string", "pattern": "^\\d{6}$" }
+                  "loanPin": { "type": "string", "pattern": "^\\d{4}$" }
                 }
               }
             }
@@ -2885,7 +2894,7 @@
                 "type": "object",
                 "required": ["loanPin"],
                 "properties": {
-                  "loanPin": { "type": "string", "pattern": "^\\d{6}$" }
+                  "loanPin": { "type": "string", "pattern": "^\\d{4}$" }
                 }
               }
             }

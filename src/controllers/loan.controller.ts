@@ -3,9 +3,10 @@ import { UserDao } from "../dao/user.dao.js";
 import { ApprovalService } from "../services/approval.service.js";
 import { LoanService } from "../services/loan.service.js";
 import { verifyLoanPin } from "../utils/loan-pin.js";
-import { LoanPurpose } from "../models/enums.js";
+import { LoanPurpose, LoanStatus } from "../models/enums.js";
 import {
   approveLoanBodySchema,
+  groupLoanListQuerySchema,
   groupLoanSchema,
   individualLoanSchema,
   loanIdParamSchema
@@ -80,7 +81,11 @@ export class LoanController {
 
   /** GET /loans/group — current user's group loans (as borrower). */
   async listGroupLoans(c: Context): Promise<Response> {
-    const loans = await this.loanService.listMyGroupLoans(c.get("userId"));
+    const query = parseWithSchema(groupLoanListQuerySchema, { status: c.req.query("status") });
+    const loans = await this.loanService.listMyGroupLoans(
+      c.get("userId"),
+      query.status as LoanStatus[] | undefined
+    );
     return c.json({ loans });
   }
 

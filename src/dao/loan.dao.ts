@@ -61,6 +61,26 @@ export class LoanDao {
     });
   }
 
+  /** Group loans belonging to provided group ids, optionally filtered by status list. */
+  findByGroupIds(
+    groupIds: string[],
+    statuses?: LoanStatus[],
+    transaction?: Transaction
+  ): Promise<Loan[]> {
+    return Loan.findAll({
+      where: {
+        groupId: { [Op.in]: groupIds },
+        ...(statuses && statuses.length > 0 ? { status: { [Op.in]: statuses } } : {})
+      },
+      order: [["createdAt", "DESC"]],
+      include: [
+        { association: "group", attributes: ["id", "name"] },
+        { association: "borrower", attributes: ["id", "fullName", "email"] }
+      ],
+      transaction
+    });
+  }
+
   /** Sum of principal amounts of loans under this mandate that are disbursed/active/repaid/defaulted. */
   async sumDisbursedAmountByMandateId(
     mandateId: string,

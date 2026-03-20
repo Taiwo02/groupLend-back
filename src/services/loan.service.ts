@@ -342,8 +342,10 @@ export class LoanService {
   }
 
   /** Loans where the authenticated user is the borrower and `groupId` is set. */
-  async listMyGroupLoans(borrowerId: string): Promise<Loan[]> {
-    return this.loanDao.findGroupByBorrowerId(borrowerId);
+  async listMyGroupLoans(userId: string, statuses?: LoanStatus[]): Promise<Loan[]> {
+    const groupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId);
+    if (groupIds.length === 0) return [];
+    return this.loanDao.findByGroupIds(groupIds, statuses);
   }
 
   private computeTotalPayable(amount: number, interestRate: number, tenorMonths: number): number {
