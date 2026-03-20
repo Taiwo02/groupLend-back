@@ -68,7 +68,7 @@ function createContainer() {
   const memberMandateDao = new MemberMandateDao();
   const accountDao = new AccountDao();
 
-  const creditService = new CreditService(groupMemberDao, userDao);
+  const creditService = new CreditService(groupMemberDao, userDao, userKycDataDao, groupDao);
   const trustService = new TrustService(userDao, groupDao);
   const emailService = new EmailService();
   const notificationService = new NotificationService(notificationDao, userDao, emailService);
@@ -91,6 +91,7 @@ function createContainer() {
     mandateDao,
     memberMandateDao,
     repaymentDao,
+    userKycDataDao,
     directDebitMandateDao,
     notificationService,
     emailService
@@ -163,7 +164,14 @@ function createContainer() {
   const ninController = new NinController(ninService);
   const lookupController = new LookupController();
   const statementSyncService = new StatementSyncService(userDao, userKycDataDao, statementDao);
-  const kycService = new KycService(userDao, userKycDataDao, kycVerificationDao, statementDao, statementSyncService);
+  const kycService = new KycService(
+    userDao,
+    userKycDataDao,
+    kycVerificationDao,
+    statementDao,
+    statementSyncService,
+    creditService
+  );
   const kycController = new KycController(kycService);
   const dashboardController = new DashboardController(dashboardService);
   const adminDashboardController = new AdminDashboardController(adminDashboardService);

@@ -2,6 +2,7 @@ import { Op, type WhereOptions } from "sequelize";
 import { Transaction } from "sequelize";
 import { UserKycData } from "../models/index.js";
 import type { KycStatus } from "../models/enums.js";
+import { toNumber } from "../utils/number.js";
 import type {
   BioDataPayload,
   ContactPayload,
@@ -21,6 +22,62 @@ export class UserKycDataDao {
       order: [["createdAt", "DESC"]],
       transaction
     });
+  }
+
+  /**
+   * Best-effort monthly income from KYC `employmentDetails` for each user.
+   * Prefers draft row (newest by createdAt), else newest submitted row with income.
+   */
+  async findEffectiveEmploymentIncomeByUserIds(
+    userIds: string[],
+    transaction?: Transaction
+  ): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    if (userIds.length === 0) return result;
+
+    const rows = await UserKycData.findAll({
+      where: { userId: { [Op.in]: userIds } },
+      attributes: ["userId", "employmentDetails", "submittedAt", "createdAt"],
+      transaction
+    });
+
+    const byUser = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const list = byUser.get(r.userId) ?? [];
+      list.push(r);
+      byUser.set(r.userId, list);
+    }
+
+    for (const uid of userIds) {
+      const list = byUser.get(uid) ?? [];
+      const drafts = list
+        .filter((r) => r.submittedAt == null)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const submitted = list
+        .filter((r) => r.submittedAt != null)
+        .sort((a, b) => new Date(b.submittedAt!).getTime() - new Date(a.submittedAt!).getTime());
+
+      let income: number | undefined;
+      for (const r of drafts) {
+        const m = r.employmentDetails?.monthlyIncome;
+        if (m != null && toNumber(m) > 0) {
+          income = toNumber(m);
+          break;
+        }
+      }
+      if (income == null) {
+        for (const r of submitted) {
+          const m = r.employmentDetails?.monthlyIncome;
+          if (m != null && toNumber(m) > 0) {
+            income = toNumber(m);
+            break;
+          }
+        }
+      }
+      if (income != null) result.set(uid, income);
+    }
+
+    return result;
   }
 
   /** For backward compat: draft if exists, else latest submitted. */

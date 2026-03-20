@@ -7,6 +7,7 @@ import { HttpError } from "../utils/http-error.js";
 import { encryptBvn, ninLookupKey } from "../utils/encryption.js";
 import type { NinLookupData } from "../types/nin.js";
 import type { StatementSyncService } from "./statement-sync.service.js";
+import type { CreditService } from "./credit.service.js";
 
 /** KYC steps: 0 = nin + fullName + address, 1 = account + BVN + code, 2 = employment. Step 3 = submitted. */
 export const KYC_MAX_STEP = 3;
@@ -90,7 +91,8 @@ export class KycService {
     private readonly userKycDataDao: UserKycDataDao,
     private readonly kycVerificationDao: KycVerificationDao,
     private readonly statementDao: StatementDao,
-    private readonly statementSyncService: StatementSyncService
+    private readonly statementSyncService: StatementSyncService,
+    private readonly creditService: CreditService
   ) {}
 
   async getStatus(userId: string): Promise<KycStatusResponse> {
@@ -177,8 +179,15 @@ export class KycService {
       await this.statementSyncService.saveStatementInfo(userId, payload.code);
     } else if (payload.step === 2) {
       await this.userKycDataDao.upsert(userId, { employmentDetails: payload.employmentDetails });
+      const mi = payload.employmentDetails.monthlyIncome;
+      const creditLimit = this.creditService.calculateIndividualCreditLimit(mi);
+      await this.userDao.updateProfile(userId, {
+        monthlyIncome: mi,
+        employmentStatus: payload.employmentDetails.employmentStatus
+      });
+      await this.userDao.updateCreditLimit(userId, creditLimit);
+      await this.creditService.recalculatePoolsForUserGroups(userId);
       await this.userDao.updateKycStatus(userId, KycStatus.SUBMITTED);
-
     }
     await this.userDao.updateKycStep(userId, nextStep);
     if (nextStep === KYC_MAX_STEP) {

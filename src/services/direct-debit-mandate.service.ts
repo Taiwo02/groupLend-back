@@ -251,7 +251,7 @@ export class DirectDebitMandateService {
     let monoCustomerId = mandate.monoCustomerId ?? user.monoCustomerId ?? null;
     if (!monoCustomerId) {
       const contact = (kyc?.contact ?? {}) as Record<string, unknown>;
-      const address = contact.address as string | undefined;
+      const address = contact.addressLine1 as string | undefined;
       const parts = (user.fullName || "User").trim().split(/\s+/);
       const firstName = parts[0] ?? "User";
       const lastName = parts.slice(1).join(" ") || firstName;
@@ -289,7 +289,7 @@ export class DirectDebitMandateService {
     if (accountsData.length === 0) {
       throw new HttpError(400, "No bank accounts returned from BVN lookup");
     }
-
+    
     const group = await this.groupDao.findById(groupId, transaction);
     if (!group) throw new HttpError(404, "Group not found");
     const amountNgn = this.resolveGroupMaxDebitNgn(group);

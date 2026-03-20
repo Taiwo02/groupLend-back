@@ -9,6 +9,7 @@ import { MandateDao } from "../dao/mandate.dao.js";
 import { MemberMandateDao } from "../dao/member-mandate.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { UserDao } from "../dao/user.dao.js";
+import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { Loan, Mandate } from "../models/index.js";
 import {
   ApprovalDecision,
@@ -53,6 +54,7 @@ export class LoanService {
     private readonly mandateDao: MandateDao,
     private readonly memberMandateDao: MemberMandateDao,
     private readonly repaymentDao: RepaymentDao,
+    private readonly userKycDataDao: UserKycDataDao,
     private readonly directDebitMandateDao: DirectDebitMandateDao,
     private readonly notificationService: NotificationService,
     private readonly emailService: EmailService
@@ -212,9 +214,12 @@ export class LoanService {
     const activeMembers = await this.groupMemberDao.findActiveMembersByGroupId(groupId, transaction);
     const userIds = activeMembers.map((m) => m.userId);
     const users = await this.userDao.findByIdsWithKyc(userIds, transaction);
+    const kycIncomes = await this.userKycDataDao.findEffectiveEmploymentIncomeByUserIds(userIds, transaction);
     let totalAccessAmount = 0;
     for (const u of users) {
-      const income = toNumber(u.monthlyIncome ?? 0);
+      const fromUser = toNumber(u.monthlyIncome ?? 0);
+      const fromKyc = kycIncomes.get(u.id) ?? 0;
+      const income = fromUser > 0 ? fromUser : fromKyc;
       totalAccessAmount += ACCESS_INCOME_RATIO * MONTHS_PER_YEAR * income;
     }
     totalAccessAmount = Number(totalAccessAmount.toFixed(2));

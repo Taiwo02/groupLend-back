@@ -84,10 +84,11 @@ export class GroupMemberDao {
     await GroupMember.update({ invitationToken: null }, { where: { invitationToken: token }, transaction });
   }
 
-  findActiveMemberUserIds(groupId: string): Promise<GroupMember[]> {
+  findActiveMemberUserIds(groupId: string, transaction?: Transaction): Promise<GroupMember[]> {
     return GroupMember.findAll({
       where: { groupId, status: GroupMemberStatus.ACTIVE },
-      attributes: ["userId"]
+      attributes: ["userId"],
+      transaction
     });
   }
 

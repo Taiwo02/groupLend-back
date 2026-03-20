@@ -12,8 +12,8 @@ export class UserDao {
     return User.findOne({where: {id}, include: [{ model: GroupMember, as: "groups", include: [{ model: Group, as: "group" }]}]});
   }
 
-  findByIds(ids: string[]): Promise<User[]> {
-    return User.findAll({ where: { id: ids }, attributes: ["id", "monthlyIncome"] });
+  findByIds(ids: string[], transaction?: Transaction): Promise<User[]> {
+    return User.findAll({ where: { id: ids }, attributes: ["id", "monthlyIncome"], transaction });
   }
 
   /** For KYC checks: returns id, kycStatus, fullName for the given user ids. */

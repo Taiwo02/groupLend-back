@@ -87,8 +87,7 @@ export class AuthService {
       });
       await this.groupInviteDao.markAccepted(acceptedInvite.id);
       await this.groupInviteDao.markExpiredForEmail(normalizedEmail, acceptedInvite.id);
-      const pool = await this.creditService.calculateGroupCreditLimit(acceptedInvite.groupId);
-      await this.groupDao.updateCreditPool(acceptedInvite.groupId, pool);
+      await this.creditService.recalculatePoolsForUserGroups(user.id);
     }
 
     const baseUrl = env.frontendUrl.replace(/\/$/, "") || "#";
@@ -222,11 +221,7 @@ export class AuthService {
     });
     await this.userDao.updateCreditLimit(userId, creditLimit);
 
-    const groupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId);
-    for (const groupId of groupIds) {
-      const pool = await this.creditService.calculateGroupCreditLimit(groupId);
-      await this.groupDao.updateCreditPool(groupId, pool);
-    }
+    await this.creditService.recalculatePoolsForUserGroups(userId);
 
     const updated = await this.userDao.findById(userId);
     if (!updated) throw new HttpError(500, "User not found after update");
