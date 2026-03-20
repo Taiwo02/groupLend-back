@@ -10,6 +10,8 @@ export function createLoanRoutes(
 ): Hono {
   const routes = new Hono();
   routes.use("*", requireAuth);
+  routes.get("/individual", (c) => loanController.listIndividualLoans(c));
+  routes.get("/group", (c) => loanController.listGroupLoans(c));
   routes.post("/individual", requireOnboardingComplete, (c) =>
     loanController.requestIndividual(c)
   );

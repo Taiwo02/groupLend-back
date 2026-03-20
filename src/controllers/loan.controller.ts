@@ -72,6 +72,18 @@ export class LoanController {
     return c.json(loan);
   }
 
+  /** GET /loans/individual — current user's individual (non-group) loans. */
+  async listIndividualLoans(c: Context): Promise<Response> {
+    const loans = await this.loanService.listMyIndividualLoans(c.get("userId"));
+    return c.json({ loans });
+  }
+
+  /** GET /loans/group — current user's group loans (as borrower). */
+  async listGroupLoans(c: Context): Promise<Response> {
+    const loans = await this.loanService.listMyGroupLoans(c.get("userId"));
+    return c.json({ loans });
+  }
+
   /** Partner callback: continue group approval process after institutional approval. */
   async institutionalApprovalCallback(c: Context): Promise<Response> {
     const params = parseWithSchema(loanIdParamSchema, { id: c.req.param("id") });

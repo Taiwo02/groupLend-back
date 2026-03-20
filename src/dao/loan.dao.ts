@@ -42,6 +42,25 @@ export class LoanDao {
     return Loan.findAll({ where: { groupId }, transaction });
   }
 
+  /** Individual loans: borrower only, no group. */
+  findIndividualByBorrowerId(borrowerId: string, transaction?: Transaction): Promise<Loan[]> {
+    return Loan.findAll({
+      where: { borrowerId, groupId: { [Op.is]: null } },
+      order: [["createdAt", "DESC"]],
+      transaction
+    });
+  }
+
+  /** Group loans: borrower with a groupId set. */
+  findGroupByBorrowerId(borrowerId: string, transaction?: Transaction): Promise<Loan[]> {
+    return Loan.findAll({
+      where: { borrowerId, groupId: { [Op.ne]: null } },
+      order: [["createdAt", "DESC"]],
+      include: [{ association: "group", attributes: ["id", "name"] }],
+      transaction
+    });
+  }
+
   /** Sum of principal amounts of loans under this mandate that are disbursed/active/repaid/defaulted. */
   async sumDisbursedAmountByMandateId(
     mandateId: string,

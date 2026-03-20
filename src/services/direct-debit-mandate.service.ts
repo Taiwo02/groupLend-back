@@ -173,6 +173,7 @@ export class DirectDebitMandateService {
         transaction
       );
     }
+    console.log("bvnEncrypted", data);
 
     const methods = (data?.methods as { method?: string }[] | undefined) ?? [];
     let filterMethod = filterBvnMethod(methods, "phone");

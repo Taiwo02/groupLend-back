@@ -2509,6 +2509,37 @@
       }
     },
     "/loans/individual": {
+      "get": {
+        "operationId": "listIndividualLoans",
+        "tags": ["Loans"],
+        "summary": "List my individual loans",
+        "description": "Returns loans where the authenticated user is the borrower and the loan is not tied to a group (`groupId` is null). Newest first.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "loans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Loan"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "requestIndividualLoan",
         "tags": ["Loans"],
@@ -2584,6 +2615,37 @@
       }
     },
     "/loans/group": {
+      "get": {
+        "operationId": "listGroupLoans",
+        "tags": ["Loans"],
+        "summary": "List my group loans",
+        "description": "Returns loans where the authenticated user is the borrower and the loan is tied to a group (`groupId` is set). Each item may include a nested `group` object with `id` and `name`. Newest first.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "loans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GroupLoan"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "requestGroupLoan",
         "tags": ["Loans"],
@@ -3212,6 +3274,26 @@
             "updatedAt": { "type": "string", "format": "date-time", "nullable": true }
           }
         },
+        "GroupLoan": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Loan"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "group": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "name": { "type": "string" }
+                  }
+                }
+              }
+            }
+          ]
+        },
         "Loan": {
           "type": "object",
           "properties": {
@@ -3224,6 +3306,11 @@
               "format": "uuid"
             },
             "groupId": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            },
+            "mandateId": {
               "type": "string",
               "format": "uuid",
               "nullable": true
@@ -3255,6 +3342,7 @@
                 "PENDING_APPROVAL",
                 "INSTITUTIONAL_PENDING",
                 "APPROVED",
+                "REJECTED",
                 "DISBURSED",
                 "ACTIVE",
                 "REPAID",
