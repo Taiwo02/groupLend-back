@@ -1,4 +1,5 @@
-import { Op, type WhereOptions } from "sequelize";
+import { Op, QueryTypes, type WhereOptions } from "sequelize";
+import { sequelize } from "../config/database.js";
 import { CreditStatus, KycStatus } from "../models/enums.js";
 import { Group, GroupMember, User } from "../models/index.js";
 import { HttpError } from "../utils/http-error.js";
@@ -29,6 +30,18 @@ export type AdminUsersSummary = {
 };
 
 export class AdminUsersService {
+  /** Sequelize `User.count` + include + distinct can emit invalid SQL (`User->User`); use explicit SQL. */
+  private async countUsersInActiveGroup(): Promise<number> {
+    const [row] = await sequelize.query<{ c: string }>(
+      `
+      SELECT COUNT(DISTINCT u.id)::text AS c
+      FROM "users" AS u
+      INNER JOIN "group_members" AS gm ON gm."userId" = u.id AND gm.status = 'ACTIVE'
+      `,
+      { type: QueryTypes.SELECT }
+    );
+    return Number(row?.c ?? 0);
+  }
 
   async getSummary(): Promise<AdminUsersSummary> {
     const [totalUsers, pendingKycUsers, activeCreditUsers, usersInActiveGroup] = await Promise.all([
@@ -37,19 +50,7 @@ export class AdminUsersService {
         where: { kycStatus: { [Op.in]: [KycStatus.PENDING, KycStatus.SUBMITTED, KycStatus.RESUBMITTED] } }
       }),
       User.count({ where: { creditStatus: CreditStatus.ACTIVE } }),
-      User.count({
-        include: [
-          {
-            model: GroupMember,
-            as: "groups",
-            attributes: [],
-            where: { status: "ACTIVE" },
-            required: true
-          }
-        ],
-        distinct: true,
-        col: "User.id"
-      })
+      this.countUsersInActiveGroup()
     ]);
     return { totalUsers, pendingKycUsers, activeCreditUsers, usersInActiveGroup };
   }
