@@ -34,6 +34,8 @@ export class Group extends Model<InferAttributes<Group>, InferCreationAttributes
   declare states: string[];
   declare expectedLoan: number | null;
   declare status: string;
+  /** When true, new group loans are blocked (admin freeze); group may stay ACTIVE. */
+  declare creditFrozen: CreationOptional<boolean>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -154,6 +156,11 @@ Group.init(
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: GroupStatus.PENDING
+    },
+    creditFrozen: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

@@ -3,8 +3,10 @@ import { AdminGroupsService } from "../services/admin-groups.service.js";
 import { GroupStatus } from "../models/enums.js";
 import {
   adminCreateGroupBodySchema,
+  adminGroupActivityQuerySchema,
   adminGroupExportQuerySchema,
   adminGroupListQuerySchema,
+  adminGroupMembersQuerySchema,
   adminPatchGroupBodySchema
 } from "../validators/admin-directory.validator.js";
 import { groupIdParamSchema } from "../validators/group.validator.js";
@@ -68,8 +70,41 @@ export class AdminGroupsController {
 
   async getGroup(c: Context): Promise<Response> {
     const { id } = parseWithSchema(groupIdParamSchema, { id: c.req.param("id") });
-    const { group, onboardingStatus, memberCount } = await this.adminGroupsService.getGroupDetail(id);
-    return c.json({ group, onboardingStatus, memberCount });
+    const detail = await this.adminGroupsService.getGroupDetail(id);
+    return c.json(detail);
+  }
+
+  async listGroupMembers(c: Context): Promise<Response> {
+    const { id } = parseWithSchema(groupIdParamSchema, { id: c.req.param("id") });
+    const q = parseWithSchema(adminGroupMembersQuerySchema, {
+      q: c.req.query("q"),
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset")
+    });
+    const limit = q.limit ?? 20;
+    const offset = q.offset ?? 0;
+    const { members, total } = await this.adminGroupsService.listGroupMembers(id, {
+      q: q.q,
+      limit,
+      offset
+    });
+    return c.json({ members, total, limit, offset });
+  }
+
+  async getGroupActivity(c: Context): Promise<Response> {
+    const { id } = parseWithSchema(groupIdParamSchema, { id: c.req.param("id") });
+    const q = parseWithSchema(adminGroupActivityQuerySchema, {
+      limit: c.req.query("limit")
+    });
+    const limit = q.limit ?? 20;
+    const items = await this.adminGroupsService.getGroupActivity(id, limit);
+    return c.json({ activity: items, limit });
+  }
+
+  async getGroupCertificate(c: Context): Promise<Response> {
+    const { id } = parseWithSchema(groupIdParamSchema, { id: c.req.param("id") });
+    const payload = this.adminGroupsService.getEligibilityCertificateStub(id);
+    return c.json(payload);
   }
 
   async patchGroup(c: Context): Promise<Response> {
@@ -78,7 +113,9 @@ export class AdminGroupsController {
     const patch = parseWithSchema(adminPatchGroupBodySchema, body);
     const updated = await this.adminGroupsService.patchGroup(id, {
       ...patch,
-      status: patch.status as GroupStatus | undefined
+      status: patch.status as GroupStatus | undefined,
+      currentCreditPool: patch.currentCreditPool,
+      creditFrozen: patch.creditFrozen
     });
     return c.json({ group: updated });
   }

@@ -183,7 +183,7 @@ function createContainer() {
   const adminKycController = new AdminKycController(adminKycService);
   const adminLoanService = new AdminLoanService(loanDao, dbDao, loanService, userDao, repaymentDao);
   const adminLoanController = new AdminLoanController(adminLoanService);
-  const adminGroupsService = new AdminGroupsService(groupDao, userDao, groupService);
+  const adminGroupsService = new AdminGroupsService(groupDao, userDao, groupService, loanDao, statementDao);
   const adminGroupsController = new AdminGroupsController(adminGroupsService);
   const adminUsersService = new AdminUsersService();
   const adminUsersController = new AdminUsersController(adminUsersService);

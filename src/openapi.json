@@ -2102,12 +2102,65 @@
         }
       }
     },
+    "/admin/groups/{id}/members": {
+      "get": {
+        "tags": ["Admin · Users & groups"],
+        "summary": "Paginated member directory (admin group detail)",
+        "description": "Members with KYC UI status, bank statement flag, and trust score. CREATOR listed first.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "q", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Filter by member name or email" },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0, "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "OK" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access denied" },
+          "404": { "description": "Group not found" }
+        }
+      }
+    },
+    "/admin/groups/{id}/activity": {
+      "get": {
+        "tags": ["Admin · Users & groups"],
+        "summary": "Recent group activity (admin)",
+        "description": "Merges paid repayments on group loans and recent loan requests, newest first.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "OK" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access denied" },
+          "404": { "description": "Group not found" }
+        }
+      }
+    },
+    "/admin/groups/{id}/certificate": {
+      "get": {
+        "tags": ["Admin · Users & groups"],
+        "summary": "Eligibility certificate (stub)",
+        "description": "Placeholder until PDF/certificate generation exists.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "JSON stub" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access denied" }
+        }
+      }
+    },
     "/admin/groups/{id}": {
       "get": {
         "tags": [
           "Admin · Users & groups"
         ],
         "summary": "Get credit group detail (admin)",
+        "description": "Group profile (without embedded members list), onboarding status, financial health, tier/eligibility flags, metadata, and insight note for the admin group detail page.",
         "security": [
           {
             "bearerAuth": []
@@ -2146,7 +2199,11 @@
                     },
                     "memberCount": {
                       "type": "integer"
-                    }
+                    },
+                    "financialHealth": { "type": "object" },
+                    "tier": { "type": "object" },
+                    "pageMetadata": { "type": "object" },
+                    "insightNote": { "type": "string", "nullable": true }
                   }
                 }
               }
@@ -2168,7 +2225,7 @@
           "Admin · Users & groups"
         ],
         "summary": "Update credit group (admin)",
-        "description": "Partial update: name, description, status, limits, targetCredit.",
+        "description": "Partial update: name, description, status, limits, targetCredit, currentCreditPool (adjust pool), creditFrozen (freeze new loans without deactivating).",
         "security": [
           {
             "bearerAuth": []
@@ -2216,6 +2273,14 @@
                   },
                   "targetCredit": {
                     "type": "number"
+                  },
+                  "currentCreditPool": {
+                    "type": "number",
+                    "description": "Adjust available pool (admin)"
+                  },
+                  "creditFrozen": {
+                    "type": "boolean",
+                    "description": "When true, new group loan requests are rejected"
                   }
                 }
               }

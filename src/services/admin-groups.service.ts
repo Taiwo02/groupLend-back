@@ -1,9 +1,19 @@
-import { QueryTypes } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 import { GroupDao } from "../dao/group.dao.js";
+import { LoanDao } from "../dao/loan.dao.js";
+import { StatementDao } from "../dao/statement.dao.js";
 import { UserDao } from "../dao/user.dao.js";
-import { Group, GroupMember, User } from "../models/index.js";
-import { GroupStatus } from "../models/enums.js";
+import { Group, GroupMember, Loan, Repayment, User } from "../models/index.js";
+import {
+  CredibilityLevel,
+  GroupMemberRole,
+  GroupMemberStatus,
+  GroupStatus,
+  KycStatus,
+  LoanStatus,
+  RepaymentStatus
+} from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { toNumber } from "../utils/number.js";
 import type { GroupService, CreateGroupInput } from "./group.service.js";
@@ -54,11 +64,93 @@ export type AdminGroupsSummary = {
   groupsPendingKyc: number;
 };
 
+export type AdminGroupFinancialHealth = {
+  totalCreditPool: number;
+  availablePool: number;
+  utilizedAmount: number;
+  utilizationPercent: number;
+  repaymentRatePercent: number;
+  averageRepaymentDelayDays: number | null;
+  riskLevel: "VERY_LOW" | "LOW" | "MODERATE" | "ELEVATED";
+  defaultRatePercent: number;
+  repaymentHistorySixMonths: Array<{ monthLabel: string; year: number; month: number; paidAmount: number }>;
+};
+
+export type AdminGroupTier = {
+  tierTitle: string;
+  credibilityLevel: CredibilityLevel;
+  credibilityScore: number;
+  institutionalLoanEligible: boolean;
+  instantDisbursalEnabled: boolean;
+};
+
+export type AdminGroupPageMetadata = {
+  establishedAt: string;
+  regions: string[];
+  industryHint: string | null;
+  averageLoanTenorMonths: number | null;
+};
+
+export type AdminGroupMemberRow = {
+  memberId: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  role: GroupMemberRole;
+  roleLabel: string;
+  memberStatus: GroupMemberStatus;
+  kycUiStatus: "VERIFIED" | "PENDING_REVIEW" | "MISSING_DOCS";
+  bankStatementStatus: "UPLOADED" | "NOT_STARTED";
+  creditScore: number | null;
+};
+
+export type AdminGroupActivityItem = {
+  type: "repayment" | "loan_requested";
+  at: string;
+  summary: string;
+  amount: number | null;
+  loanId: string | null;
+};
+
+function memberKycUi(k: KycStatus): "VERIFIED" | "PENDING_REVIEW" | "MISSING_DOCS" {
+  if (k === KycStatus.APPROVED) return "VERIFIED";
+  if (k === KycStatus.REJECTED) return "MISSING_DOCS";
+  return "PENDING_REVIEW";
+}
+
+function roleLabel(role: GroupMemberRole): string {
+  if (role === GroupMemberRole.CREATOR) return "Group Lead";
+  return "Member";
+}
+
+function serializeGroupRecord(g: Group): Record<string, unknown> {
+  const plain = g.get({ plain: true }) as Record<string, unknown>;
+  delete plain.members;
+  for (const key of [
+    "targetCredit",
+    "currentCreditPool",
+    "credibilityScore",
+    "minimumAmount",
+    "maximumAmount",
+    "expectedLoan",
+    "interest",
+    "penalCharges",
+    "overGracePenalCharges"
+  ]) {
+    const v = plain[key];
+    if (v != null && v !== "") plain[key] = toNumber(String(v));
+  }
+  plain.creditFrozen = Boolean(plain.creditFrozen);
+  return plain;
+}
+
 export class AdminGroupsService {
   constructor(
     private readonly groupDao: GroupDao,
     private readonly userDao: UserDao,
-    private readonly groupService: GroupService
+    private readonly groupService: GroupService,
+    private readonly loanDao: LoanDao,
+    private readonly statementDao: StatementDao
   ) {}
 
   async getSummary(): Promise<AdminGroupsSummary> {
@@ -214,6 +306,10 @@ export class AdminGroupsService {
     group: Record<string, unknown>;
     onboardingStatus: AdminGroupOnboardingStatus;
     memberCount: number;
+    financialHealth: AdminGroupFinancialHealth;
+    tier: AdminGroupTier;
+    pageMetadata: AdminGroupPageMetadata;
+    insightNote: string | null;
   }> {
     const row = await Group.findByPk(groupId, {
       include: [
@@ -240,21 +336,333 @@ export class AdminGroupsService {
       .filter((m: MemberWithUser) => m.status === "ACTIVE" || m.status === "INVITED")
       .map((m: MemberWithUser) => ({
         status: m.status,
-        kycStatus: m.user?.kycStatus ?? "PENDING"
+        kycStatus: m.user?.kycStatus ?? KycStatus.PENDING
       }));
     let onboardingStatus: AdminGroupOnboardingStatus = "ACTIVE";
     if (group.status === GroupStatus.INACTIVE) onboardingStatus = "FLAGGED";
     else if (group.status === GroupStatus.PENDING) onboardingStatus = "ONBOARDING";
-    else if (memberRows.some((m) => m.kycStatus === "FLAGGED")) onboardingStatus = "FLAGGED";
-    else if (memberRows.some((m) => m.kycStatus !== "APPROVED")) onboardingStatus = "PENDING_KYC";
-
-    const plain = group.get({ plain: true }) as Record<string, unknown>;
+    else if (memberRows.some((m) => m.kycStatus === KycStatus.FLAGGED)) onboardingStatus = "FLAGGED";
+    else if (memberRows.some((m) => m.kycStatus !== KycStatus.APPROVED)) onboardingStatus = "PENDING_KYC";
 
     const memberCount = members.filter(
-      (m: MemberWithUser) => m.status === "ACTIVE" || m.status === "INVITED"
+      (m: MemberWithUser) => m.status === GroupMemberStatus.ACTIVE || m.status === GroupMemberStatus.INVITED
     ).length;
 
-    return { group: plain, onboardingStatus, memberCount };
+    const loans = await this.loanDao.findByGroupId(groupId);
+    const loanIds = loans.map((l) => l.id);
+    const repayments =
+      loanIds.length > 0
+        ? await Repayment.findAll({ where: { loanId: { [Op.in]: loanIds } } })
+        : [];
+
+    const financialHealth = this.buildFinancialHealth(group, loans, repayments);
+    const tier = this.buildTier(group, onboardingStatus, memberCount);
+    const pageMetadata = this.buildPageMetadata(group, loans);
+    const insightNote = this.buildInsightNote(loans);
+
+    const plain = serializeGroupRecord(group);
+
+    return {
+      group: plain,
+      onboardingStatus,
+      memberCount,
+      financialHealth,
+      tier,
+      pageMetadata,
+      insightNote
+    };
+  }
+
+  private buildFinancialHealth(
+    group: Group,
+    loans: Loan[],
+    repayments: Repayment[]
+  ): AdminGroupFinancialHealth {
+    const cap =
+      toNumber(group.maximumAmount) > 0
+        ? toNumber(group.maximumAmount)
+        : toNumber(group.targetCredit) > 0
+          ? toNumber(group.targetCredit)
+          : toNumber(group.currentCreditPool);
+    const available = toNumber(group.currentCreditPool);
+    const utilizedAmount =
+      cap > 0 ? Math.max(0, cap - available) : loans.reduce((s, l) => s + toNumber(l.amount), 0);
+    const utilizationPercent = cap > 0 ? Math.round((utilizedAmount / cap) * 1000) / 10 : 0;
+
+    const totalInst = repayments.length;
+    const paidInst = repayments.filter((r) => r.status === RepaymentStatus.PAID).length;
+    const repaymentRatePercent =
+      totalInst > 0 ? Math.round((paidInst / totalInst) * 1000) / 10 : 100;
+
+    const paidWithDates = repayments.filter(
+      (r) => r.status === RepaymentStatus.PAID && r.paidAt != null
+    );
+    let averageRepaymentDelayDays: number | null = null;
+    if (paidWithDates.length > 0) {
+      const sumDays = paidWithDates.reduce((acc, r) => {
+        const due = new Date(r.dueDate).getTime();
+        const paid = new Date(r.paidAt!).getTime();
+        return acc + Math.max(0, (paid - due) / (86400 * 1000));
+      }, 0);
+      averageRepaymentDelayDays = Math.round((sumDays / paidWithDates.length) * 10) / 10;
+    }
+
+    const lifecycle = loans.filter((l) =>
+      [
+        LoanStatus.ACTIVE,
+        LoanStatus.DISBURSED,
+        LoanStatus.REPAID,
+        LoanStatus.DEFAULTED
+      ].includes(l.status)
+    );
+    const defaulted = loans.filter((l) => l.status === LoanStatus.DEFAULTED).length;
+    const defaultRatePercent =
+      lifecycle.length > 0 ? Math.round((defaulted / lifecycle.length) * 10000) / 100 : 0;
+
+    let riskLevel: AdminGroupFinancialHealth["riskLevel"] = "VERY_LOW";
+    if (defaultRatePercent > 5) riskLevel = "ELEVATED";
+    else if (defaultRatePercent > 1) riskLevel = "MODERATE";
+    else if (defaultRatePercent > 0) riskLevel = "LOW";
+
+    const repaymentHistorySixMonths = this.lastSixMonthsRepaidSeries(repayments);
+
+    return {
+      totalCreditPool: cap,
+      availablePool: available,
+      utilizedAmount,
+      utilizationPercent,
+      repaymentRatePercent,
+      averageRepaymentDelayDays,
+      riskLevel,
+      defaultRatePercent,
+      repaymentHistorySixMonths
+    };
+  }
+
+  private lastSixMonthsRepaidSeries(
+    repayments: Repayment[]
+  ): Array<{ monthLabel: string; year: number; month: number; paidAmount: number }> {
+    const now = new Date();
+    const buckets: Array<{ monthLabel: string; year: number; month: number; paidAmount: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const monthLabel = d.toLocaleString("en-US", { month: "short" });
+      buckets.push({ monthLabel, year, month: month + 1, paidAmount: 0 });
+    }
+    for (const r of repayments) {
+      if (r.status !== RepaymentStatus.PAID || !r.paidAt) continue;
+      const p = new Date(r.paidAt);
+      const b = buckets.find((x) => x.year === p.getFullYear() && x.month === p.getMonth() + 1);
+      if (b) b.paidAmount += toNumber(r.amount);
+    }
+    return buckets;
+  }
+
+  private buildTier(
+    group: Group,
+    onboardingStatus: AdminGroupOnboardingStatus,
+    memberCount: number
+  ): AdminGroupTier {
+    const level = group.credibilityLevel;
+    const tierTitle =
+      level === CredibilityLevel.VERIFIED_TRUST_GROUP
+        ? "Tier 1 — Verified trust group"
+        : "Standard";
+    const institutionalLoanEligible = level === CredibilityLevel.VERIFIED_TRUST_GROUP;
+    const instantDisbursalEnabled =
+      onboardingStatus === "ACTIVE" && !group.creditFrozen && memberCount > 0 && group.status === GroupStatus.ACTIVE;
+
+    return {
+      tierTitle,
+      credibilityLevel: level,
+      credibilityScore: toNumber(group.credibilityScore),
+      institutionalLoanEligible,
+      instantDisbursalEnabled
+    };
+  }
+
+  private buildPageMetadata(group: Group, loans: Loan[]): AdminGroupPageMetadata {
+    const states = Array.isArray(group.states) ? (group.states as string[]) : [];
+    const tenorLoans = loans.filter((l) =>
+      [LoanStatus.ACTIVE, LoanStatus.REPAID, LoanStatus.DEFAULTED, LoanStatus.DISBURSED].includes(l.status)
+    );
+    const avgTenor =
+      tenorLoans.length > 0
+        ? Math.round(
+            (tenorLoans.reduce((s, l) => s + l.tenorMonths, 0) / tenorLoans.length) * 10
+          ) / 10
+        : null;
+    const desc = group.description?.trim() ?? null;
+
+    return {
+      establishedAt: group.createdAt.toISOString(),
+      regions: states.length > 0 ? states : [],
+      industryHint: desc && desc.length > 0 ? desc : null,
+      averageLoanTenorMonths: avgTenor
+    };
+  }
+
+  private buildInsightNote(loans: Loan[]): string | null {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 18);
+    const recentDefault = loans.some(
+      (l) => l.status === LoanStatus.DEFAULTED && new Date(l.createdAt) >= cutoff
+    );
+    if (!recentDefault) {
+      return "No member defaults recorded in this group in the last 18 months.";
+    }
+    return null;
+  }
+
+  async listGroupMembers(
+    groupId: string,
+    opts: { q?: string; limit: number; offset: number }
+  ): Promise<{ members: AdminGroupMemberRow[]; total: number }> {
+    const g = await this.groupDao.findById(groupId);
+    if (!g) throw new HttpError(404, "Group not found");
+
+    const term = opts.q?.trim();
+    const baseWhere: Record<string, unknown> = {
+      groupId,
+      status: { [Op.in]: [GroupMemberStatus.ACTIVE, GroupMemberStatus.INVITED] }
+    };
+    const where: Record<string, unknown> = term
+      ? {
+          [Op.and]: [
+            baseWhere,
+            {
+              [Op.or]: [
+                { "$user.fullName$": { [Op.iLike]: `%${term}%` } },
+                { "$user.email$": { [Op.iLike]: `%${term}%` } }
+              ]
+            }
+          ]
+        }
+      : baseWhere;
+
+    const { rows, count } = await GroupMember.findAndCountAll({
+      where,
+      distinct: true,
+      col: "GroupMember.id",
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "fullName", "email", "kycStatus", "trustScore"]
+        }
+      ],
+      limit: opts.limit,
+      offset: opts.offset,
+      order: [
+        ["role", "ASC"],
+        ["createdAt", "ASC"]
+      ],
+      subQuery: false
+    });
+
+    const userIds = rows.map((r) => r.userId);
+    const statements = await this.statementDao.findByUserIds(userIds);
+    const stmtByUser = new Map(statements.map((s) => [s.userId, s]));
+
+    type GM = GroupMember & { user?: User };
+    const members: AdminGroupMemberRow[] = rows.map((row) => {
+      const m = row as GM;
+      const u = m.user!;
+      const kyc = u.kycStatus ?? KycStatus.PENDING;
+      const st = stmtByUser.get(u.id);
+      const bankOk = st?.status === true;
+
+      return {
+        memberId: m.id,
+        userId: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        role: m.role,
+        roleLabel: roleLabel(m.role),
+        memberStatus: m.status,
+        kycUiStatus: memberKycUi(kyc),
+        bankStatementStatus: bankOk ? "UPLOADED" : "NOT_STARTED",
+        creditScore: u.trustScore != null ? toNumber(String(u.trustScore)) : null
+      };
+    });
+
+    return { members, total: count };
+  }
+
+  async getGroupActivity(groupId: string, limit: number): Promise<AdminGroupActivityItem[]> {
+    const g = await this.groupDao.findById(groupId);
+    if (!g) throw new HttpError(404, "Group not found");
+
+    const repayments = await Repayment.findAll({
+      where: { status: RepaymentStatus.PAID, paidAt: { [Op.ne]: null } },
+      include: [
+        {
+          model: Loan,
+          as: "loan",
+          where: { groupId },
+          required: true,
+          attributes: ["id", "borrowerId", "amount"],
+          include: [{ model: User, as: "borrower", attributes: ["fullName"] }]
+        }
+      ],
+      order: [["paidAt", "DESC"]],
+      limit
+    });
+
+    type RWithLoan = Repayment & {
+      loan?: Loan & { borrower?: { fullName: string } };
+    };
+
+    const fromRepayments: AdminGroupActivityItem[] = repayments.map((r) => {
+      const rw = r as RWithLoan;
+      const name = rw.loan?.borrower?.fullName ?? "Member";
+      return {
+        type: "repayment" as const,
+        at: r.paidAt!.toISOString(),
+        summary: `${name} repayment`,
+        amount: toNumber(r.amount),
+        loanId: rw.loan?.id ?? null
+      };
+    });
+
+    const recentLoans = await Loan.findAll({
+      where: { groupId },
+      order: [["createdAt", "DESC"]],
+      limit: Math.min(5, limit),
+      include: [{ model: User, as: "borrower", attributes: ["fullName"] }]
+    });
+
+    type LWithB = Loan & { borrower?: { fullName: string } };
+    const fromLoans: AdminGroupActivityItem[] = recentLoans.map((l) => {
+      const lw = l as LWithB;
+      const name = lw.borrower?.fullName ?? "Member";
+      return {
+        type: "loan_requested" as const,
+        at: l.createdAt.toISOString(),
+        summary: `${name} loan request (${l.status})`,
+        amount: toNumber(l.amount),
+        loanId: l.id
+      };
+    });
+
+    const merged = [...fromRepayments, ...fromLoans].sort(
+      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
+    );
+    return merged.slice(0, limit);
+  }
+
+  getEligibilityCertificateStub(groupId: string): {
+    available: boolean;
+    documentUrl: string | null;
+    message: string;
+  } {
+    return {
+      available: false,
+      documentUrl: null,
+      message: `Eligibility certificate for group ${groupId} is not generated by the API yet.`
+    };
   }
 
   async patchGroup(
@@ -266,6 +674,8 @@ export class AdminGroupsService {
       maximumAmount?: number | null;
       minimumAmount?: number | null;
       targetCredit?: number;
+      currentCreditPool?: number;
+      creditFrozen?: boolean;
     }
   ): Promise<Group> {
     const existing = await this.groupDao.findById(groupId);

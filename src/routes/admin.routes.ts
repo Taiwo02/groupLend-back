@@ -32,6 +32,9 @@ export function createAdminRoutes(
   routes.get("/groups/export", (c) => adminGroupsController.exportGroups(c));
   routes.get("/groups", (c) => adminGroupsController.listGroups(c));
   routes.post("/groups", (c) => adminGroupsController.createGroup(c));
+  routes.get("/groups/:id/members", (c) => adminGroupsController.listGroupMembers(c));
+  routes.get("/groups/:id/activity", (c) => adminGroupsController.getGroupActivity(c));
+  routes.get("/groups/:id/certificate", (c) => adminGroupsController.getGroupCertificate(c));
   routes.get("/groups/:id", (c) => adminGroupsController.getGroup(c));
   routes.patch("/groups/:id", (c) => adminGroupsController.patchGroup(c));
 

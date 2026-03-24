@@ -25,9 +25,21 @@ export const adminPatchGroupBodySchema = z
     status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]).optional(),
     maximumAmount: z.coerce.number().nonnegative().nullable().optional(),
     minimumAmount: z.coerce.number().nonnegative().nullable().optional(),
-    targetCredit: z.coerce.number().nonnegative().optional()
+    targetCredit: z.coerce.number().nonnegative().optional(),
+    currentCreditPool: z.coerce.number().nonnegative().optional(),
+    creditFrozen: z.boolean().optional()
   })
   .refine((d) => Object.keys(d).length > 0, { message: "At least one field is required" });
+
+export const adminGroupMembersQuerySchema = z.object({
+  q: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional()
+});
+
+export const adminGroupActivityQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional()
+});
 
 export const adminUserListQuerySchema = z.object({
   q: z.string().optional(),

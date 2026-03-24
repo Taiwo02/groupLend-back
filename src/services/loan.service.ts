@@ -92,6 +92,9 @@ export class LoanService {
   async requestGroupLoan(input: GroupLoanRequestInput): Promise<Loan> {
     const group = await this.groupDao.findById(input.groupId);
     if (!group) throw new HttpError(404, "Group not found");
+    if (group.creditFrozen) {
+      throw new HttpError(403, "This group's credit is frozen by an administrator");
+    }
 
     const borrowerMembership = await this.groupMemberDao.findByGroupAndUser(
       input.groupId,

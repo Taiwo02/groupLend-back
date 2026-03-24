@@ -99,6 +99,8 @@ export class GroupDao {
       maximumAmount: number | null;
       minimumAmount: number | null;
       targetCredit: number;
+      currentCreditPool: number;
+      creditFrozen: boolean;
     }>,
     transaction?: Transaction
   ): Promise<void> {
