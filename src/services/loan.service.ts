@@ -141,6 +141,23 @@ export class LoanService {
         throw new HttpError(400, "Amount exceeds group credit pool");
       }
 
+      const mandateEndYmd =
+        typeof mandate.endDate === "string"
+          ? (mandate.endDate as string).slice(0, 10)
+          : toLocalDateYmd(mandate.endDate instanceof Date ? mandate.endDate : new Date(mandate.endDate));
+      const loanLastRepaymentYmd = toLocalDateYmd(addLocalMonths(new Date(), input.tenorMonths));
+      if (loanLastRepaymentYmd > mandateEndYmd) {
+        throw new HttpError(
+          400,
+          "Loan tenor extends beyond the current group mandate end date. Renew the group mandate or reduce the loan tenor so the last repayment falls on or before the mandate expires.",
+          {
+            mandateEndDate: mandateEndYmd,
+            lastRepaymentDateIfStartingNow: loanLastRepaymentYmd,
+            tenorMonths: input.tenorMonths
+          }
+        );
+      }
+
       const initialStatus = isInstitutional
         ? LoanStatus.INSTITUTIONAL_PENDING
         : LoanStatus.PENDING_APPROVAL;
@@ -290,6 +307,17 @@ export class LoanService {
       return loan;
     }
 
+    const mayDisburseFrom = [
+      LoanStatus.APPROVED,
+      LoanStatus.REVIEWING,
+      LoanStatus.PROCESSING
+    ];
+    if (!mayDisburseFrom.includes(loan.status)) {
+      throw new HttpError(400, "Loan cannot be disbursed in its current status", {
+        status: loan.status
+      });
+    }
+
     if (loan.groupId) {
       const members = await this.groupMemberDao.findActiveMemberUserIds(loan.groupId);
       const userIds = members.map((m) => m.userId);
@@ -299,12 +327,14 @@ export class LoanService {
         transaction
       );
       const nonCompliant: string[] = [];
+      const debitOk = (s: MandateStatus | undefined) =>
+        s === MandateStatus.ACTIVE || s === MandateStatus.INPROGRESS;
       for (const uid of userIds) {
         const status = mandateStatusByUser.get(uid);
-        if (status !== MandateStatus.ACTIVE) nonCompliant.push(uid);
+        if (!debitOk(status)) nonCompliant.push(uid);
       }
       if (nonCompliant.length > 0) {
-        throw new HttpError(400, "All members must have an ACTIVE direct debit mandate before disbursement", {
+        throw new HttpError(400, "All members must have an active or in-progress direct debit mandate before disbursement", {
           nonCompliantMemberIds: nonCompliant
         });
       }

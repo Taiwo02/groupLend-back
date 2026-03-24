@@ -137,6 +137,75 @@ export class LoanDao {
     }));
   }
 
+  /**
+   * Admin: all loans with filters on createdAt and/or status.
+   * `dateTo` is inclusive for the calendar day (end of day UTC boundary using local date string optional — use end of day in query).
+   */
+  async findForAdminList(
+    filters: {
+      status?: LoanStatus | LoanStatus[];
+      dateFrom?: Date;
+      dateTo?: Date;
+      limit?: number;
+      offset?: number;
+    },
+    transaction?: Transaction
+  ): Promise<Loan[]> {
+    const where: Record<string, unknown> = {};
+    if (filters.status !== undefined) {
+      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+      if (statuses.length > 0) where.status = { [Op.in]: statuses };
+    }
+    if (filters.dateFrom || filters.dateTo) {
+      const range: { [Op.gte]?: Date; [Op.lte]?: Date } = {};
+      if (filters.dateFrom) range[Op.gte] = filters.dateFrom;
+      if (filters.dateTo) {
+        const end = new Date(filters.dateTo);
+        end.setHours(23, 59, 59, 999);
+        range[Op.lte] = end;
+      }
+      where.createdAt = range;
+    }
+    return Loan.findAll({
+      where,
+      order: [["createdAt", "DESC"]],
+      limit: filters.limit ?? 100,
+      offset: filters.offset ?? 0,
+      include: [
+        { association: "borrower", attributes: ["id", "fullName", "email"] },
+        { association: "group", attributes: ["id", "name"], required: false },
+        { association: "approvals", required: false }
+      ],
+      transaction
+    });
+  }
+
+  async countForAdminList(
+    filters: {
+      status?: LoanStatus | LoanStatus[];
+      dateFrom?: Date;
+      dateTo?: Date;
+    },
+    transaction?: Transaction
+  ): Promise<number> {
+    const where: Record<string, unknown> = {};
+    if (filters.status !== undefined) {
+      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+      if (statuses.length > 0) where.status = { [Op.in]: statuses };
+    }
+    if (filters.dateFrom || filters.dateTo) {
+      const range: { [Op.gte]?: Date; [Op.lte]?: Date } = {};
+      if (filters.dateFrom) range[Op.gte] = filters.dateFrom;
+      if (filters.dateTo) {
+        const end = new Date(filters.dateTo);
+        end.setHours(23, 59, 59, 999);
+        range[Op.lte] = end;
+      }
+      where.createdAt = range;
+    }
+    return Loan.count({ where, transaction });
+  }
+
   /** Recent loans with borrower, for admin dashboard. */
   async findRecentWithBorrower(
     limit: number,

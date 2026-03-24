@@ -159,7 +159,7 @@ Group.init(
     updatedAt: DataTypes.DATE
   },
   {
-    sequelize,
+    sequelize,  
     tableName: "groups",
     timestamps: true
   }

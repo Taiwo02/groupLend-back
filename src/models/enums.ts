@@ -29,6 +29,10 @@ export enum LoanStatus {
   PENDING_APPROVAL = "PENDING_APPROVAL",
   INSTITUTIONAL_PENDING = "INSTITUTIONAL_PENDING",
   APPROVED = "APPROVED",
+  /** Internal review after all group members approved. */
+  REVIEWING = "REVIEWING",
+  /** Funds / ops processing before disbursement. */
+  PROCESSING = "PROCESSING",
   REJECTED = "REJECTED",
   DISBURSED = "DISBURSED",
   ACTIVE = "ACTIVE",

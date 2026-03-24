@@ -42,7 +42,14 @@ export function createApp(): Hono {
   app.route("/auth/lookup", createLookupRoutes(container.lookupController));
   app.route("/auth/kyc", createKycRoutes(container.kycController));
   app.route("/dashboard", createDashboardRoutes(container.dashboardController));
-  app.route("/admin", createAdminRoutes(container.adminDashboardController, container.adminKycController));
+  app.route(
+    "/admin",
+    createAdminRoutes(
+      container.adminDashboardController,
+      container.adminKycController,
+      container.adminLoanController
+    )
+  );
   app.route("/groups", createGroupRoutes(container.groupController, container.directDebitMandateController));
   app.route(
     "/loans",

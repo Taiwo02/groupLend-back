@@ -9,7 +9,6 @@ import { ApprovalDecision, LoanStatus, MandateStatus } from "../models/enums.js"
 import { GroupMemberStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { EmailService } from "../email/email.service.js";
-import { LoanService } from "./loan.service.js";
 import { NotificationService } from "./notification.service.js";
 import { TrustService } from "./trust.service.js";
 
@@ -18,7 +17,6 @@ export class ApprovalService {
     private readonly dbDao: DbDao,
     private readonly loanDao: LoanDao,
     private readonly loanApprovalDao: LoanApprovalDao,
-    private readonly loanService: LoanService,
     private readonly groupMemberDao: GroupMemberDao,
     private readonly userDao: UserDao,
     private readonly trustService: TrustService,
@@ -51,11 +49,11 @@ export class ApprovalService {
           loan.groupId,
           transaction
         );
-        const hasRunningMandate =
+        const debitOk =
           directMandate &&
-          directMandate.status === MandateStatus.ACTIVE &&
+          (directMandate.status === MandateStatus.ACTIVE || directMandate.status === MandateStatus.INPROGRESS) &&
           this.isMandateWithinYear(directMandate.createdAt ?? new Date(0));
-        if (!hasRunningMandate) {
+        if (!debitOk) {
           throw new HttpError(
             400,
             "You must create and authorize a direct debit mandate for this group in the last 12 months before approving this loan"
@@ -95,7 +93,7 @@ export class ApprovalService {
 
       if (pendingCount === 0) {
         await loan.update({ status: LoanStatus.APPROVED }, { transaction });
-        const disbursed = await this.loanService.disburseLoan(loan.id, transaction);
+        await loan.reload({ transaction });
         this.notificationService
           .notifyLoanApproval(loan.borrowerId, Number(loan.amount))
           .catch(() => {});
@@ -109,7 +107,7 @@ export class ApprovalService {
             })
             .catch(() => {});
         }
-        return disbursed;
+        return loan;
       }
       return loan;
     });

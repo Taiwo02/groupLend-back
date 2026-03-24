@@ -7,6 +7,7 @@ import { NinController } from "./controllers/nin.controller.js";
 import { DashboardController } from "./controllers/dashboard.controller.js";
 import { AdminDashboardController } from "./controllers/admin-dashboard.controller.js";
 import { AdminKycController } from "./controllers/admin-kyc.controller.js";
+import { AdminLoanController } from "./controllers/admin-loan.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
 import { DirectDebitMandateController } from "./controllers/direct-debit-mandate.controller.js";
 import { LoanController } from "./controllers/loan.controller.js";
@@ -38,6 +39,7 @@ import { CreditService } from "./services/credit.service.js";
 import { DashboardService } from "./services/dashboard.service.js";
 import { AdminDashboardService } from "./services/admin-dashboard.service.js";
 import { AdminKycService } from "./services/admin-kyc.service.js";
+import { AdminLoanService } from "./services/admin-loan.service.js";
 import { GroupService } from "./services/group.service.js";
 import { InvitationService } from "./services/invitation.service.js";
 import { NotificationService } from "./services/notification.service.js";
@@ -100,7 +102,6 @@ function createContainer() {
     dbDao,
     loanDao,
     loanApprovalDao,
-    loanService,
     groupMemberDao,
     userDao,
     trustService,
@@ -176,6 +177,8 @@ function createContainer() {
   const dashboardController = new DashboardController(dashboardService);
   const adminDashboardController = new AdminDashboardController(adminDashboardService);
   const adminKycController = new AdminKycController(adminKycService);
+  const adminLoanService = new AdminLoanService(loanDao, dbDao, loanService);
+  const adminLoanController = new AdminLoanController(adminLoanService);
   const loanController = new LoanController(loanService, approvalService, userDao);
   const groupController = new GroupController(groupService);
   const directDebitMandateController = new DirectDebitMandateController(directDebitMandateService);
@@ -205,6 +208,7 @@ function createContainer() {
     dashboardController,
     adminDashboardController,
     adminKycController,
+    adminLoanController,
     loanController,
     groupController,
     directDebitMandateController,

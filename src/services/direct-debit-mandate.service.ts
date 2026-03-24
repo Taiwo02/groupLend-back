@@ -28,6 +28,11 @@ const MANDATE_AMOUNT_BUFFER_RATIO = 1.3;
 const MANDATE_END_DAYS_EXTRA = 60;
 const ACCOUNT_MANDATE_REFRESH_HOURS = 3;
 
+/** Direct-debit mandate states where BVN-linked accounts have been persisted (list endpoint). */
+export function directDebitMandateAllowsListingAccounts(status: MandateStatus): boolean {
+  return status === MandateStatus.INPROGRESS || status === MandateStatus.ACTIVE;
+}
+
 export type GetMandateResult = {
   id: string;
   groupId: string | null;
@@ -55,12 +60,18 @@ export class DirectDebitMandateService {
 
   /**
    * List saved direct-debit accounts for the current user in the group (current group mandate period).
-   * Empty list if there is no active mandate period or no linked accounts yet.
+   * Returns [] unless the user's latest direct-debit mandate for this group is INPROGRESS or ACTIVE
+   * (accounts have been fetched from BVN / linking completed). Accounts are ordered by createdAt desc.
    */
   async listSavedDebitAccounts(userId: string, groupId: string): Promise<Record<string, unknown>[]> {
     const membership = await this.groupMemberDao.findByGroupAndUser(groupId, userId);
     if (!membership || membership.status !== GroupMemberStatus.ACTIVE) {
       throw new HttpError(403, "Not an active member of this group");
+    }
+
+    const ddm = await this.directDebitMandateDao.findByUserAndGroup(userId, groupId);
+    if (!ddm || !directDebitMandateAllowsListingAccounts(ddm.status)) {
+      return [];
     }
 
     await this.mandateDao.expireMandatesPastEndDate(groupId);
@@ -70,7 +81,7 @@ export class DirectDebitMandateService {
     const memberMandate = await this.memberMandateDao.findByMandateAndUser(groupMandate.id, userId);
     if (!memberMandate) return [];
 
-    const rows = await this.accountDao.findByMemberMandateId(memberMandate.id);
+    const rows = await this.accountDao.findByMemberMandateIdOrderByCreatedDesc(memberMandate.id);
     return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a));
   }
 

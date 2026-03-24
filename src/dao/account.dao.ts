@@ -100,4 +100,16 @@ export class AccountDao {
   ): Promise<Account[]> {
     return Account.findAll({ where: { memberMandateId }, transaction });
   }
+
+  /** Saved debit accounts for a member mandate, newest first. */
+  findByMemberMandateIdOrderByCreatedDesc(
+    memberMandateId: string,
+    transaction?: Transaction
+  ): Promise<Account[]> {
+    return Account.findAll({
+      where: { memberMandateId },
+      order: [["createdAt", "DESC"]],
+      transaction
+    });
+  }
 }

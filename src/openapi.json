@@ -1601,6 +1601,69 @@
         }
       }
     },
+    "/admin/loan-requests": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List loan requests (admin)",
+        "description": "Paginated list of all loans. Optional filters: `status` (comma-separated LoanStatus), `dateFrom` and `dateTo` (ISO date, filters by createdAt). If `ADMIN_EMAILS` is set, the JWT user email must be in that list.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Comma-separated statuses e.g. PENDING_APPROVAL,APPROVED" },
+          { "name": "dateFrom", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } },
+          { "name": "dateTo", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 50 } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "loans": { "type": "array", "items": { "type": "object"} },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access denied (ADMIN_EMAILS)" }
+        }
+      }
+    },
+    "/admin/loans/{id}/status": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Set group loan admin workflow status",
+        "description": "REVIEWING from APPROVED; PROCESSING from APPROVED or REVIEWING; DISBURSED runs disbursement (credit pool, repayment schedule, ACTIVE). Group loans only.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["REVIEWING", "PROCESSING", "DISBURSED"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "400": { "description": "Invalid transition or not a group loan" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access denied" },
+          "404": { "description": "Loan not found" }
+        }
+      }
+    },
     "/admin/kyc/count": {
       "get": {
         "tags": [
@@ -2388,7 +2451,7 @@
         "operationId": "listDirectDebitSavedAccounts",
         "tags": ["Groups"],
         "summary": "List saved direct-debit accounts for this group",
-        "description": "Returns bank accounts linked for the current user under the group's current lending mandate period (same shape as confirm response accounts). Empty array if there is no active mandate period, no member mandate, or no accounts saved yet. Requires active group membership.",
+        "description": "Returns bank accounts linked for the current user under the group's current lending mandate period (same shape as confirm response accounts), ordered by createdAt descending. Empty array unless the user's latest direct-debit mandate for this group is INPROGRESS or ACTIVE (BVN/accounts flow completed). Also empty if there is no current group mandate period, no member mandate, or no accounts saved. Requires active group membership.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -2690,7 +2753,7 @@
         "operationId": "requestGroupLoan",
         "tags": ["Loans"],
         "summary": "Request group loan",
-        "description": "Create a group loan; all active group members must approve. Each approver must have an active direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. Requires onboarding complete and loan PIN in body.",
+        "description": "Create a group loan; all active group members must approve. Each approver must have an active direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -2757,7 +2820,7 @@
             }
           },
           "400": {
-            "description": "Amount exceeds pool or no active members"
+            "description": "Amount exceeds pool/access, KYC incomplete, tenor extends beyond group mandate end date, or no active members"
           },
           "403": {
             "description": "Not active member or onboarding/PIN"
@@ -3382,6 +3445,8 @@
                 "PENDING_APPROVAL",
                 "INSTITUTIONAL_PENDING",
                 "APPROVED",
+                "REVIEWING",
+                "PROCESSING",
                 "REJECTED",
                 "DISBURSED",
                 "ACTIVE",

@@ -62,6 +62,8 @@ export class GroupDao {
           LoanStatus.PENDING_APPROVAL,
           LoanStatus.INSTITUTIONAL_PENDING,
           LoanStatus.APPROVED,
+          LoanStatus.REVIEWING,
+          LoanStatus.PROCESSING,
           LoanStatus.DISBURSED,
           LoanStatus.ACTIVE,
           LoanStatus.DEFAULTED

@@ -125,7 +125,11 @@ export class AdminDashboardService {
     const recentLoansList: AdminRecentLoan[] = recentLoans.map((loan) => {
       const borrower = (loan as unknown as { borrower?: { fullName: string } }).borrower;
       const status =
-        loan.status === LoanStatus.APPROVED || loan.status === LoanStatus.DISBURSED || loan.status === LoanStatus.ACTIVE
+        loan.status === LoanStatus.APPROVED ||
+        loan.status === LoanStatus.REVIEWING ||
+        loan.status === LoanStatus.PROCESSING ||
+        loan.status === LoanStatus.DISBURSED ||
+        loan.status === LoanStatus.ACTIVE
           ? "Approved"
           : loan.status === LoanStatus.PENDING_APPROVAL || loan.status === LoanStatus.REQUESTED
             ? "Pending"

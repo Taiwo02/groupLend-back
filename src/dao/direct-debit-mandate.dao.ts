@@ -17,6 +17,7 @@ export class DirectDebitMandateDao {
     return DirectDebitMandate.findByPk(id, { transaction });
   }
 
+  /** Latest direct-debit mandate row for this user+group (multiple rows possible across renewals). */
   findByUserAndGroup(
     userId: string,
     groupId: string,
@@ -24,6 +25,7 @@ export class DirectDebitMandateDao {
   ): Promise<DirectDebitMandate | null> {
     return DirectDebitMandate.findOne({
       where: { userId, groupId },
+      order: [["createdAt", "DESC"]],
       transaction
     });
   }
@@ -60,6 +62,7 @@ export class DirectDebitMandateDao {
     return set;
   }
 
+  /** Latest direct-debit mandate status per user in the group (multiple rows per user+group possible). */
   async findAllActiveByGroupUserIds(
     groupId: string,
     userIds: string[],
@@ -67,11 +70,12 @@ export class DirectDebitMandateDao {
   ): Promise<Map<string, MandateStatus>> {
     const mandates = await DirectDebitMandate.findAll({
       where: { groupId, userId: userIds },
+      order: [["createdAt", "DESC"]],
       transaction
     });
     const map = new Map<string, MandateStatus>();
     for (const m of mandates) {
-      map.set(m.userId, m.status);
+      if (!map.has(m.userId)) map.set(m.userId, m.status);
     }
     return map;
   }

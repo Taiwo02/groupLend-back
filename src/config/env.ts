@@ -33,7 +33,15 @@ export const env = {
   /** 32-byte key (hex or UTF-8) for BVN encryption. Required if KYC step 1 (account/BVN) is used. */
   encryptionKey: process.env.ENCRYPTION_KEY ?? "",
   /** Secret for NIN lookup key (HMAC). Defaults to JWT_SECRET if not set. */
-  ninLookupSecret: process.env.NIN_LOOKUP_SECRET
+  ninLookupSecret: process.env.NIN_LOOKUP_SECRET,
+  /**
+   * Comma-separated admin emails. If non-empty, `/admin/*` routes require the JWT email to match one of them.
+   * If empty, any authenticated user can call admin routes (legacy behaviour).
+   */
+  adminEmails: (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
 };
 
 if (!env.databaseUrl) {
