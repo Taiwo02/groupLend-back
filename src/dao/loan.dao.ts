@@ -1,9 +1,15 @@
-import { Op } from "sequelize";
+import { Op, type WhereOptions } from "sequelize";
 import { Transaction } from "sequelize";
 import { Loan } from "../models/index.js";
 import { LoanStatus } from "../models/enums.js";
 
 const DISBURSED_STATUSES = [LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.REPAID, LoanStatus.DEFAULTED];
+
+export type AdminLoanOperationsTab =
+  | "pending_disbursement"
+  | "active"
+  | "repayment_schedule"
+  | "declined";
 
 export class LoanDao {
   createLoan(
@@ -108,6 +114,23 @@ export class LoanDao {
       where: { status: { [Op.in]: [LoanStatus.DISBURSED, LoanStatus.ACTIVE] } },
       transaction
     });
+  }
+
+  async countByStatuses(statuses: LoanStatus[], transaction?: Transaction): Promise<number> {
+    if (statuses.length === 0) return 0;
+    return Loan.count({
+      where: { status: { [Op.in]: statuses } },
+      transaction
+    });
+  }
+
+  async sumAmountByStatuses(statuses: LoanStatus[], transaction?: Transaction): Promise<number> {
+    if (statuses.length === 0) return 0;
+    const result = await Loan.sum("amount", {
+      where: { status: { [Op.in]: statuses } },
+      transaction
+    });
+    return Number(result ?? 0);
   }
 
   /** Count defaulted loans. */
@@ -249,5 +272,104 @@ export class LoanDao {
       weekLabel: `WEEK ${i + 1}`,
       total
     }));
+  }
+
+  private tabWhereForOperations(tab: AdminLoanOperationsTab): WhereOptions<Loan> {
+    switch (tab) {
+      case "pending_disbursement":
+        return {
+          status: {
+            [Op.in]: [LoanStatus.APPROVED, LoanStatus.REVIEWING, LoanStatus.PROCESSING]
+          }
+        };
+      case "active":
+        return { status: LoanStatus.ACTIVE };
+      case "declined":
+        return { status: LoanStatus.REJECTED };
+      case "repayment_schedule":
+        return { status: LoanStatus.ACTIVE };
+    }
+  }
+
+  /**
+   * Admin loan operations dashboard: tabbed list with search (borrower, group name, loan id).
+   */
+  async findForAdminOperations(
+    opts: {
+      tab: AdminLoanOperationsTab;
+      q?: string;
+      limit: number;
+      offset: number;
+    },
+    transaction?: Transaction
+  ): Promise<Loan[]> {
+    const baseWhere = this.tabWhereForOperations(opts.tab);
+    const term = opts.q?.trim();
+    let where: WhereOptions<Loan> = baseWhere;
+    if (term) {
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(term);
+      const orParts: WhereOptions<Loan>[] = [
+        { "$borrower.fullName$": { [Op.iLike]: `%${term}%` } },
+        { "$borrower.email$": { [Op.iLike]: `%${term}%` } },
+        { "$group.name$": { [Op.iLike]: `%${term}%` } }
+      ];
+      if (uuidLike) orParts.unshift({ id: term });
+      where = { [Op.and]: [baseWhere, { [Op.or]: orParts }] };
+    }
+
+    const include: import("sequelize").Includeable[] = [
+      { association: "borrower", attributes: ["id", "fullName", "email", "loanPinHash"] },
+      { association: "group", attributes: ["id", "name"], required: false },
+      { association: "approvals", required: false }
+    ];
+    if (opts.tab === "repayment_schedule") {
+      include.push({
+        association: "repayments",
+        required: false,
+        attributes: ["id", "dueDate", "amount", "status", "createdAt"],
+        separate: true,
+        order: [["dueDate", "ASC"]]
+      });
+    }
+
+    return Loan.findAll({
+      where,
+      include,
+      limit: opts.limit,
+      offset: opts.offset,
+      order: [["createdAt", "DESC"]],
+      subQuery: false,
+      transaction
+    });
+  }
+
+  async countForAdminOperations(
+    opts: { tab: AdminLoanOperationsTab; q?: string },
+    transaction?: Transaction
+  ): Promise<number> {
+    const baseWhere = this.tabWhereForOperations(opts.tab);
+    const term = opts.q?.trim();
+    let where: WhereOptions<Loan> = baseWhere;
+    if (term) {
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(term);
+      const orParts: WhereOptions<Loan>[] = [
+        { "$borrower.fullName$": { [Op.iLike]: `%${term}%` } },
+        { "$borrower.email$": { [Op.iLike]: `%${term}%` } },
+        { "$group.name$": { [Op.iLike]: `%${term}%` } }
+      ];
+      if (uuidLike) orParts.unshift({ id: term });
+      where = { [Op.and]: [baseWhere, { [Op.or]: orParts }] };
+    }
+
+    return Loan.count({
+      where,
+      distinct: true,
+      col: "Loan.id",
+      include: [
+        { association: "borrower", attributes: [], required: true },
+        { association: "group", attributes: [], required: false }
+      ],
+      transaction
+    });
   }
 }

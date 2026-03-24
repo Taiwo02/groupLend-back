@@ -37,6 +37,8 @@ export const initModelAssociations = (): void => {
   Group.hasMany(GroupMember, { foreignKey: "groupId", as: "members" });
   GroupMember.belongsTo(Group, { foreignKey: "groupId", as: "group" });
   GroupMember.belongsTo(User, { foreignKey: "userId", as: "user" });
+  User.hasMany(Group, { foreignKey: "createdBy", as: "createdGroups" });
+  Group.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 
   Group.hasMany(Loan, { foreignKey: "groupId", as: "loans" });
   Loan.belongsTo(Group, { foreignKey: "groupId", as: "group" });

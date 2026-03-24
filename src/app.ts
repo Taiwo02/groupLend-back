@@ -47,7 +47,9 @@ export function createApp(): Hono {
     createAdminRoutes(
       container.adminDashboardController,
       container.adminKycController,
-      container.adminLoanController
+      container.adminLoanController,
+      container.adminGroupsController,
+      container.adminUsersController
     )
   );
   app.route("/groups", createGroupRoutes(container.groupController, container.directDebitMandateController));

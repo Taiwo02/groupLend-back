@@ -89,4 +89,19 @@ export class GroupDao {
   ): Promise<void> {
     await Group.update(data, { where: { id }, transaction });
   }
+
+  async updateGroup(
+    id: string,
+    data: Partial<{
+      name: string;
+      description: string | null;
+      status: string;
+      maximumAmount: number | null;
+      minimumAmount: number | null;
+      targetCredit: number;
+    }>,
+    transaction?: Transaction
+  ): Promise<void> {
+    await Group.update(data, { where: { id }, transaction });
+  }
 }

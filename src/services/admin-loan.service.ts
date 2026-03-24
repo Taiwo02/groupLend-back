@@ -1,7 +1,10 @@
 import { DbDao } from "../dao/db.dao.js";
+import type { AdminLoanOperationsTab } from "../dao/loan.dao.js";
 import { LoanDao } from "../dao/loan.dao.js";
-import { Loan } from "../models/index.js";
-import { LoanStatus } from "../models/enums.js";
+import { RepaymentDao } from "../dao/repayment.dao.js";
+import { UserDao } from "../dao/user.dao.js";
+import { Loan, LoanApproval, Repayment } from "../models/index.js";
+import { ApprovalDecision, LoanStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { LoanService } from "./loan.service.js";
 import { toNumber } from "../utils/number.js";
@@ -30,11 +33,69 @@ export type AdminLoanListItem = {
   approvals?: Array<{ approverId: string; decision: string; respondedAt: string | null }>;
 };
 
+const PENDING_DISBURSEMENT_STATUSES: LoanStatus[] = [
+  LoanStatus.APPROVED,
+  LoanStatus.REVIEWING,
+  LoanStatus.PROCESSING
+];
+
+export type AdminLoanOperationsSummary = {
+  totalActiveLoans: number;
+  totalActiveLoansChangePercent: number;
+  pendingDisbursementsValue: number;
+  pendingDisbursementsChangePercent: number;
+  repaymentRatePercent: number;
+  repaymentRateChangePercent: number;
+  totalPortfolioValue: number;
+  totalPortfolioValueChangePercent: number;
+};
+
+export type AdminLoanOperationsRow = {
+  id: string;
+  displayId: string;
+  displayName: string;
+  borrowerName: string;
+  borrowerId: string;
+  isGroupLoan: boolean;
+  group: { id: string; name: string } | null;
+  amount: number;
+  status: LoanStatus;
+  disbursementReadiness: "FULLY_APPROVED" | "AWAITING_PIN" | null;
+  dateApproved: string | null;
+  canDisburse: boolean;
+  createdAt: string;
+  updatedAt: string;
+  repayments?: Array<{
+    id: string;
+    dueDate: string;
+    amount: number;
+    status: string;
+  }>;
+};
+
+export function formatAdminLoanDisplayId(loan: { id: string; groupId: string | null }): string {
+  const compact = loan.id.replace(/-/g, "").toUpperCase();
+  const n = parseInt(compact.slice(0, 8), 16) % 10000;
+  const suffix = loan.groupId ? "G" : "X";
+  return `LN-${String(n).padStart(4, "0")}-${suffix}`;
+}
+
+function computeDateApprovedIso(approvals: LoanApproval[] | undefined): string | null {
+  if (!approvals?.length) return null;
+  const times = approvals
+    .filter((a) => a.decision === ApprovalDecision.APPROVED && a.respondedAt)
+    .map((a) => new Date(a.respondedAt!).getTime());
+  if (times.length === 0) return null;
+  return new Date(Math.max(...times)).toISOString();
+}
+
 export class AdminLoanService {
   constructor(
     private readonly loanDao: LoanDao,
     private readonly dbDao: DbDao,
-    private readonly loanService: LoanService
+    private readonly loanService: LoanService,
+    private readonly userDao: UserDao,
+    private readonly repaymentDao: RepaymentDao
   ) {}
 
   async listLoanRequests(params: {
@@ -123,6 +184,115 @@ export class AdminLoanService {
       }
       return this.loanService.disburseLoan(loanId, transaction);
     });
+  }
+
+  /** Borrower must have set loan PIN; runs the same pipeline as PATCH …/status DISBURSED. */
+  async executeDisbursement(loanId: string): Promise<Loan> {
+    const loan = await this.loanDao.findById(loanId);
+    if (!loan) throw new HttpError(404, "Loan not found");
+    const borrower = await this.userDao.findById(loan.borrowerId);
+    if (!borrower?.loanPinHash) {
+      throw new HttpError(
+        400,
+        "Borrower must set a loan PIN before disbursement can be executed"
+      );
+    }
+    return this.setLoanStatus(loanId, LoanStatus.DISBURSED);
+  }
+
+  async getLoanOperationsSummary(): Promise<AdminLoanOperationsSummary> {
+    const [
+      totalActiveLoans,
+      pendingDisbursementsValue,
+      totalPortfolioValue,
+      repaymentCounts
+    ] = await Promise.all([
+      this.loanDao.countByStatuses([LoanStatus.ACTIVE]),
+      this.loanDao.sumAmountByStatuses(PENDING_DISBURSEMENT_STATUSES),
+      this.loanDao.sumPortfolioValue(),
+      this.repaymentDao.countTotalAndPaid()
+    ]);
+    const { total: repaymentTotal, paid: repaymentPaid } = repaymentCounts;
+    const repaymentRatePercent =
+      repaymentTotal > 0 ? Math.round((repaymentPaid / repaymentTotal) * 1000) / 10 : 100;
+    return {
+      totalActiveLoans,
+      totalActiveLoansChangePercent: 0,
+      pendingDisbursementsValue,
+      pendingDisbursementsChangePercent: 0,
+      repaymentRatePercent,
+      repaymentRateChangePercent: 0,
+      totalPortfolioValue,
+      totalPortfolioValueChangePercent: 0
+    };
+  }
+
+  async listLoanOperations(params: {
+    tab: AdminLoanOperationsTab;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ loans: AdminLoanOperationsRow[]; total: number; tab: AdminLoanOperationsTab }> {
+    const limit = Math.min(params.limit ?? 10, 100);
+    const offset = Math.max(0, params.offset ?? 0);
+    const [rows, total] = await Promise.all([
+      this.loanDao.findForAdminOperations({
+        tab: params.tab,
+        q: params.q,
+        limit,
+        offset
+      }),
+      this.loanDao.countForAdminOperations({ tab: params.tab, q: params.q })
+    ]);
+    return {
+      loans: rows.map((l) => this.serializeOperationsRow(l, params.tab)),
+      total,
+      tab: params.tab
+    };
+  }
+
+  private serializeOperationsRow(loan: Loan, tab: AdminLoanOperationsTab): AdminLoanOperationsRow {
+    const raw = loan.toJSON() as Record<string, unknown>;
+    const borrower = raw.borrower as
+      | { id: string; fullName: string; email: string; loanPinHash?: string | null }
+      | undefined;
+    const group = raw.group as { id: string; name: string } | null | undefined;
+    const hasPin = !!borrower?.loanPinHash;
+    const isPending = PENDING_DISBURSEMENT_STATUSES.includes(loan.status);
+    const approvals = (loan as Loan & { approvals?: LoanApproval[] }).approvals;
+
+    const repaymentsRaw = (loan as Loan & { repayments?: Repayment[] }).repayments;
+    const repayments =
+      tab === "repayment_schedule" && Array.isArray(repaymentsRaw)
+        ? repaymentsRaw.map((r) => ({
+            id: r.id,
+            dueDate: r.dueDate.toISOString(),
+            amount: toNumber(r.amount),
+            status: r.status
+          }))
+        : undefined;
+
+    return {
+      id: loan.id,
+      displayId: formatAdminLoanDisplayId(loan),
+      displayName: group?.name ?? borrower?.fullName ?? "Unknown",
+      borrowerName: borrower?.fullName ?? "Unknown",
+      borrowerId: loan.borrowerId,
+      isGroupLoan: !!loan.groupId,
+      group: group ? { id: group.id, name: group.name } : null,
+      amount: toNumber(loan.amount),
+      status: loan.status,
+      disbursementReadiness: isPending
+        ? hasPin
+          ? "FULLY_APPROVED"
+          : "AWAITING_PIN"
+        : null,
+      dateApproved: computeDateApprovedIso(approvals),
+      canDisburse: isPending && hasPin && !!loan.groupId,
+      createdAt: loan.createdAt.toISOString(),
+      updatedAt: loan.updatedAt.toISOString(),
+      repayments
+    };
   }
 
   private serializeLoan(loan: Loan): AdminLoanListItem {

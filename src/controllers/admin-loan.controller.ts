@@ -1,6 +1,10 @@
 import { Context } from "hono";
 import { AdminLoanService } from "../services/admin-loan.service.js";
 import { LoanStatus } from "../models/enums.js";
+import {
+  adminLoanOperationsExportQuerySchema,
+  adminLoanOperationsListQuerySchema
+} from "../validators/admin-loan-operations.validator.js";
 import { parseWithSchema } from "../utils/request.js";
 import { z } from "zod";
 
@@ -61,5 +65,60 @@ export class AdminLoanController {
     const { status } = parseWithSchema(patchStatusSchema, body);
     const loan = await this.adminLoanService.setLoanStatus(id, status);
     return c.json({ loan: { id: loan.id, status: loan.status, updatedAt: loan.updatedAt.toISOString() } });
+  }
+
+  /** GET /admin/loan-operations/summary */
+  async getLoanOperationsSummary(c: Context): Promise<Response> {
+    const data = await this.adminLoanService.getLoanOperationsSummary();
+    return c.json(data);
+  }
+
+  /** GET /admin/loan-operations/loans?tab=&q=&limit=&offset= */
+  async listLoanOperations(c: Context): Promise<Response> {
+    const q = parseWithSchema(adminLoanOperationsListQuerySchema, {
+      tab: c.req.query("tab"),
+      q: c.req.query("q"),
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset")
+    });
+    const data = await this.adminLoanService.listLoanOperations({
+      tab: q.tab,
+      q: q.q,
+      limit: q.limit,
+      offset: q.offset
+    });
+    return c.json({ ...data, limit: q.limit ?? 10, offset: q.offset ?? 0 });
+  }
+
+  /** GET /admin/loan-operations/export */
+  async exportLoanOperations(c: Context): Promise<Response> {
+    const q = parseWithSchema(adminLoanOperationsExportQuerySchema, {
+      tab: c.req.query("tab"),
+      q: c.req.query("q"),
+      limit: c.req.query("limit")
+    });
+    const limit = q.limit ?? 5000;
+    const data = await this.adminLoanService.listLoanOperations({
+      tab: q.tab,
+      q: q.q,
+      limit,
+      offset: 0
+    });
+    c.header("Content-Disposition", 'attachment; filename="loan-operations.json"');
+    return c.json({
+      tab: q.tab,
+      loans: data.loans,
+      exported: data.loans.length,
+      totalMatched: data.total
+    });
+  }
+
+  /** POST /admin/loans/:id/disburse */
+  async disburseLoan(c: Context): Promise<Response> {
+    const { id } = parseWithSchema(loanIdParamSchema, { id: c.req.param("id") });
+    const loan = await this.adminLoanService.executeDisbursement(id);
+    return c.json({
+      loan: { id: loan.id, status: loan.status, updatedAt: loan.updatedAt.toISOString() }
+    });
   }
 }

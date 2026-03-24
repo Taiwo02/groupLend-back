@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Enlace Group Loan API",
-    "description": "API for group lending: onboarding, loans, repayments, trust and credibility.",
+    "description": "API for group lending: onboarding, loans, repayments, trust and credibility.\n\nDocumentation layout: **Admin** and **Users** are top-level groups in the sidebar when your viewer supports `x-tagGroups` (e.g. Redoc, Stoplight). Sub-bullets (Dashboard, KYC, …) are OpenAPI tags. **Note:** borrower KYC lives under `/auth/kyc`, `/auth/nin`, `/auth/lookup` (shown as **Users · KYC**). Swagger UI often lists tags flat and alphabetically.",
     "version": "1.0.0",
     "license": {
       "name": "ISC"
@@ -16,51 +16,83 @@
   ],
   "tags": [
     {
-      "name": "Health",
-      "description": "Health check"
+      "name": "Admin · Dashboard",
+      "description": "Admin home: KPI dashboard (`GET /admin/dashboard`) and cross-entity search (`GET /admin/search`). Requires admin JWT when ADMIN_EMAILS is set."
     },
     {
-      "name": "Auth",
-      "description": "Signup, verify email, login, profile, forget-password, set-password, change-password, income, PIN"
+      "name": "Admin · KYC",
+      "description": "Admin KYC: counts, list, detail, approve/reject, Mono verify/statement (`/admin/kyc/...`)."
     },
     {
-      "name": "NIN",
-      "description": "Standalone NIN lookup and OTP verification"
+      "name": "Admin · Users & groups",
+      "description": "Admin credit groups and users: summaries, list, export, create group, detail, patch (`/admin/groups/...`, `/admin/users/...`)."
     },
     {
-      "name": "Lookup",
-      "description": "Bank account lookup (verify account number and bank)"
+      "name": "Admin · Loan operations",
+      "description": "Admin loan desk: operations dashboard KPIs and tabbed lists (`/admin/loan-operations/...`), loan request queue (`/admin/loan-requests`), workflow status and disburse (`/admin/loans/{id}/status`, `POST /admin/loans/{id}/disburse`)."
     },
     {
-      "name": "KYC",
-      "description": "Customer KYC step-by-step flow and go-back"
+      "name": "Admin · Institutional lenders",
+      "description": "Partner callback for institutional approval (`POST /loans/{id}/institutional-approval`)."
     },
     {
-      "name": "Dashboard",
-      "description": "Aggregated user dashboard"
+      "name": "Users · Health",
+      "description": "Service health (`GET /health`)."
     },
+    {
+      "name": "Users · Auth",
+      "description": "Account lifecycle: signup, login, profile, passwords, invitations, income, loan PIN (`/auth/...` except KYC/NIN/lookup routes)."
+    },
+    {
+      "name": "Users · KYC",
+      "description": "Borrower KYC flow and helpers (`/auth/kyc/...`, `/auth/nin/...`, `/auth/lookup/...`)."
+    },
+    {
+      "name": "Users · Dashboard",
+      "description": "Borrower dashboard (`GET /dashboard`)."
+    },
+    {
+      "name": "Users · Groups",
+      "description": "Groups, invites, exits, direct-debit mandates (`/groups/...`)."
+    },
+    {
+      "name": "Users · Loans",
+      "description": "Loan requests, get loan, member approve/reject (`/loans/...` except institutional callback)."
+    },
+    {
+      "name": "Users · Repayments",
+      "description": "Repayments (`/repayments`)."
+    }
+  ],
+  "x-tagGroups": [
     {
       "name": "Admin",
-      "description": "Admin dashboard, KPIs, search (loans, users, transactions)"
+      "tags": [
+        "Admin · Dashboard",
+        "Admin · KYC",
+        "Admin · Users & groups",
+        "Admin · Loan operations",
+        "Admin · Institutional lenders"
+      ]
     },
     {
-      "name": "Groups",
-      "description": "Groups and members"
-    },
-    {
-      "name": "Loans",
-      "description": "Individual and group loans"
-    },
-    {
-      "name": "Repayments",
-      "description": "Record repayments"
+      "name": "Users",
+      "tags": [
+        "Users · Health",
+        "Users · Auth",
+        "Users · KYC",
+        "Users · Dashboard",
+        "Users · Groups",
+        "Users · Loans",
+        "Users · Repayments"
+      ]
     }
   ],
   "paths": {
     "/health": {
       "get": {
         "tags": [
-          "Health"
+          "Users · Health"
         ],
         "summary": "Health check",
         "responses": {
@@ -80,7 +112,7 @@
     "/auth/signup": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Sign up",
         "requestBody": {
@@ -157,7 +189,7 @@
     "/auth/verify-email": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Verify email",
         "description": "Verifies the user's email using the token sent in the welcome email. The frontend verify-email page (e.g. opened from the link in the email) should read the token from the URL and send it in the request body.",
@@ -208,7 +240,7 @@
     "/auth/profile": {
       "get": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Get current user profile",
         "security": [
@@ -244,7 +276,7 @@
     "/auth/forget-password": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Request password reset",
         "description": "Sends a password reset email if an account exists. Always returns the same message for security.",
@@ -290,7 +322,7 @@
     "/auth/set-password": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Set new password with reset token",
         "description": "Set a new password using the token from the forget-password email link.",
@@ -346,7 +378,7 @@
     "/auth/change-password": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Change password (authenticated)",
         "description": "Change password for the current user. Requires current password.",
@@ -410,7 +442,7 @@
     "/auth/member-invitation/{token}": {
       "get": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Get invitation by token",
         "description": "Returns invitation details for the link baseUrl/member-invitation/{token}. Use to show the invite page (group name, inviter). type 'signup' = not yet registered; type 'invited' = existing user, must sign in to accept.",
@@ -468,7 +500,7 @@
     "/auth/member-invitation/{token}/accept": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Accept invitation",
         "description": "Accept the group invitation. For type 'signup': send signup in body (email must match invite); account is created and verify-email is sent. For type 'invited': send Authorization header (logged-in user must be the invitee).",
@@ -579,7 +611,7 @@
     "/auth/member-invitation/{token}/reject": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Reject invitation",
         "parameters": [
@@ -617,7 +649,7 @@
     "/auth/login": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Log in",
         "requestBody": {
@@ -681,7 +713,7 @@
     "/auth/income": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Submit income (and employment). Recomputes credit limit and group pools.",
         "security": [
@@ -736,7 +768,7 @@
     "/auth/pin": {
       "post": {
         "tags": [
-          "Auth"
+          "Users · Auth"
         ],
         "summary": "Set loan PIN once (4 digits). Cannot be set again after it is set.",
         "security": [
@@ -780,7 +812,7 @@
     "/auth/nin/lookup": {
       "post": {
         "tags": [
-          "NIN"
+          "Users · KYC"
         ],
         "summary": "Lookup NIN and send OTP",
         "description": "Looks up NIN, sends OTP to phone on NIN record, and stores pending verification server-side.",
@@ -836,7 +868,7 @@
     "/auth/nin/verify": {
       "post": {
         "tags": [
-          "NIN"
+          "Users · KYC"
         ],
         "summary": "Verify NIN OTP",
         "description": "Verifies OTP for submitted NIN and saves ninData in user_kyc_data.",
@@ -900,10 +932,16 @@
     },
     "/auth/lookup/banks": {
       "get": {
-        "tags": ["Lookup"],
+        "tags": [
+          "Users · KYC"
+        ],
         "summary": "Get list of banks",
         "description": "Returns list of banks (Mono lookup/banks). Use nip_code or bank_code when verifying account.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Lookup successful",
@@ -912,8 +950,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "successful" },
-                    "message": { "type": "string", "example": "Lookup Successful" },
+                    "status": {
+                      "type": "string",
+                      "example": "successful"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Lookup Successful"
+                    },
                     "data": {
                       "type": "object",
                       "properties": {
@@ -922,9 +966,16 @@
                           "items": {
                             "type": "object",
                             "properties": {
-                              "name": { "type": "string" },
-                              "bank_code": { "type": "string", "nullable": true },
-                              "nip_code": { "type": "string" }
+                              "name": {
+                                "type": "string"
+                              },
+                              "bank_code": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nip_code": {
+                                "type": "string"
+                              }
                             }
                           }
                         }
@@ -935,27 +986,46 @@
               }
             }
           },
-          "400": { "description": "Bank list lookup failed" },
-          "401": { "description": "Unauthorized" }
+          "400": {
+            "description": "Bank list lookup failed"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
     "/auth/lookup/account": {
       "post": {
-        "tags": ["Lookup"],
+        "tags": [
+          "Users · KYC"
+        ],
         "summary": "Verify bank account number",
         "description": "Looks up account name and bank details for the given account number and bank code (Mono lookup/account-number).",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["accountNumber", "bankCode"],
+                "required": [
+                  "accountNumber",
+                  "bankCode"
+                ],
                 "properties": {
-                  "accountNumber": { "type": "string", "description": "Bank account number" },
-                  "bankCode": { "type": "string", "description": "Bank code (e.g. 000015)" }
+                  "accountNumber": {
+                    "type": "string",
+                    "description": "Bank account number"
+                  },
+                  "bankCode": {
+                    "type": "string",
+                    "description": "Bank code (e.g. 000015)"
+                  }
                 }
               }
             }
@@ -969,19 +1039,37 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "successful" },
-                    "message": { "type": "string", "example": "Lookup Successful" },
+                    "status": {
+                      "type": "string",
+                      "example": "successful"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Lookup Successful"
+                    },
                     "data": {
                       "type": "object",
                       "properties": {
-                        "name": { "type": "string", "description": "Account holder name" },
-                        "account_number": { "type": "string" },
-                        "bvn": { "type": "string", "nullable": true },
+                        "name": {
+                          "type": "string",
+                          "description": "Account holder name"
+                        },
+                        "account_number": {
+                          "type": "string"
+                        },
+                        "bvn": {
+                          "type": "string",
+                          "nullable": true
+                        },
                         "bank": {
                           "type": "object",
                           "properties": {
-                            "name": { "type": "string" },
-                            "code": { "type": "string" }
+                            "name": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            }
                           }
                         }
                       }
@@ -991,15 +1079,19 @@
               }
             }
           },
-          "400": { "description": "Account lookup failed or invalid request" },
-          "401": { "description": "Unauthorized" }
+          "400": {
+            "description": "Account lookup failed or invalid request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
     "/auth/kyc/status": {
       "get": {
         "tags": [
-          "KYC"
+          "Users · KYC"
         ],
         "summary": "Get KYC status and current step",
         "security": [
@@ -1072,7 +1164,7 @@
     "/auth/kyc/step": {
       "put": {
         "tags": [
-          "KYC"
+          "Users · KYC"
         ],
         "summary": "Submit current KYC step (advances to next step)",
         "description": "NIN verification is separate under /auth/nin. KYC now has 3 steps: 0 (nin+fullName+address), 1 (account+bvn+code), 2 (employmentDetails).",
@@ -1276,7 +1368,7 @@
     "/auth/kyc/step/back": {
       "post": {
         "tags": [
-          "KYC"
+          "Users · KYC"
         ],
         "summary": "Go back to a previous KYC step",
         "security": [
@@ -1336,7 +1428,7 @@
     "/dashboard": {
       "get": {
         "tags": [
-          "Dashboard"
+          "Users · Dashboard"
         ],
         "summary": "Get dashboard (requires onboarding complete)",
         "security": [
@@ -1407,11 +1499,27 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "userId": { "type": "string", "format": "uuid" },
-                          "fullName": { "type": "string" },
-                          "email": { "type": "string" },
-                          "status": { "type": "string", "enum": ["INVITED"] },
-                          "invitedAt": { "type": "string", "format": "date-time", "nullable": true }
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "INVITED"
+                            ]
+                          },
+                          "invitedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
                         }
                       }
                     }
@@ -1429,7 +1537,7 @@
     "/admin/dashboard": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin · Dashboard"
         ],
         "summary": "Get admin dashboard",
         "description": "Returns KPIs (portfolio value, active loans, default rate, pending KYC), portfolio growth by week, system alerts, recent loan operations, and distribution by loan type.",
@@ -1449,14 +1557,30 @@
                     "kpis": {
                       "type": "object",
                       "properties": {
-                        "portfolioValue": { "type": "number" },
-                        "portfolioValueChangePercent": { "type": "number" },
-                        "activeLoans": { "type": "integer" },
-                        "activeLoansChangePercent": { "type": "number" },
-                        "defaultRate": { "type": "number" },
-                        "defaultRateChangePercent": { "type": "number" },
-                        "pendingKyc": { "type": "integer" },
-                        "pendingKycChangePercent": { "type": "number" }
+                        "portfolioValue": {
+                          "type": "number"
+                        },
+                        "portfolioValueChangePercent": {
+                          "type": "number"
+                        },
+                        "activeLoans": {
+                          "type": "integer"
+                        },
+                        "activeLoansChangePercent": {
+                          "type": "number"
+                        },
+                        "defaultRate": {
+                          "type": "number"
+                        },
+                        "defaultRateChangePercent": {
+                          "type": "number"
+                        },
+                        "pendingKyc": {
+                          "type": "integer"
+                        },
+                        "pendingKycChangePercent": {
+                          "type": "number"
+                        }
                       }
                     },
                     "portfolioGrowth": {
@@ -1464,8 +1588,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "weekLabel": { "type": "string" },
-                          "total": { "type": "number" }
+                          "weekLabel": {
+                            "type": "string"
+                          },
+                          "total": {
+                            "type": "number"
+                          }
                         }
                       }
                     },
@@ -1474,12 +1602,30 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "type": { "type": "string" },
-                          "title": { "type": "string" },
-                          "message": { "type": "string" },
-                          "timestamp": { "type": "string", "format": "date-time" },
-                          "severity": { "type": "string", "enum": ["error", "warning", "info"] }
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "error",
+                              "warning",
+                              "info"
+                            ]
+                          }
                         }
                       }
                     },
@@ -1488,12 +1634,26 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "loanId": { "type": "string", "format": "uuid" },
-                          "borrowerName": { "type": "string" },
-                          "loanType": { "type": "string", "nullable": true },
-                          "amount": { "type": "number" },
-                          "status": { "type": "string" },
-                          "currency": { "type": "string" }
+                          "loanId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "borrowerName": {
+                            "type": "string"
+                          },
+                          "loanType": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "number"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "currency": {
+                            "type": "string"
+                          }
                         }
                       }
                     },
@@ -1502,8 +1662,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "label": { "type": "string" },
-                          "percent": { "type": "number" }
+                          "label": {
+                            "type": "string"
+                          },
+                          "percent": {
+                            "type": "number"
+                          }
                         }
                       }
                     }
@@ -1521,7 +1685,7 @@
     "/admin/search": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin · Dashboard"
         ],
         "summary": "Search loans, users, or transactions",
         "description": "Search across users (by fullName or email), loans (by id or amount), and repayments/transactions (by id or loanId).",
@@ -1536,14 +1700,21 @@
             "in": "query",
             "required": false,
             "description": "Search term",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
             "description": "Max results per category (default 20, max 50)",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
           }
         ],
         "responses": {
@@ -1559,9 +1730,16 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string", "format": "uuid" },
-                          "fullName": { "type": "string" },
-                          "email": { "type": "string" }
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          }
                         }
                       }
                     },
@@ -1570,10 +1748,19 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string", "format": "uuid" },
-                          "amount": { "type": "number" },
-                          "status": { "type": "string" },
-                          "borrowerName": { "type": "string" }
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "amount": {
+                            "type": "number"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "borrowerName": {
+                            "type": "string"
+                          }
                         }
                       }
                     },
@@ -1582,11 +1769,24 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string", "format": "uuid" },
-                          "loanId": { "type": "string", "format": "uuid" },
-                          "amount": { "type": "number" },
-                          "status": { "type": "string" },
-                          "dueDate": { "type": "string", "format": "date-time" }
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "loanId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "amount": {
+                            "type": "number"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "dueDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
                         }
                       }
                     }
@@ -1601,18 +1801,17 @@
         }
       }
     },
-    "/admin/loan-requests": {
+    "/admin/groups/summary": {
       "get": {
-        "tags": ["Admin"],
-        "summary": "List loan requests (admin)",
-        "description": "Paginated list of all loans. Optional filters: `status` (comma-separated LoanStatus), `dateFrom` and `dateTo` (ISO date, filters by createdAt). If `ADMIN_EMAILS` is set, the JWT user email must be in that list.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Comma-separated statuses e.g. PENDING_APPROVAL,APPROVED" },
-          { "name": "dateFrom", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } },
-          { "name": "dateTo", "in": "query", "required": false, "schema": { "type": "string", "format": "date" } },
-          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 50 } },
-          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer", "default": 0 } }
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Credit groups KPIs (admin)",
+        "description": "Total groups, sum of credit limit proxy (COALESCE(maximumAmount, targetCredit)) for ACTIVE groups, and count of groups with derived onboarding status PENDING_KYC.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ],
         "responses": {
           "200": {
@@ -1622,52 +1821,1018 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "loans": { "type": "array", "items": { "type": "object"} },
-                    "total": { "type": "integer" }
+                    "totalGroups": {
+                      "type": "integer"
+                    },
+                    "activeCreditExposure": {
+                      "type": "number"
+                    },
+                    "groupsPendingKyc": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "403": { "description": "Admin access denied (ADMIN_EMAILS)" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
         }
       }
     },
-    "/admin/loans/{id}/status": {
-      "patch": {
-        "tags": ["Admin"],
-        "summary": "Set group loan admin workflow status",
-        "description": "REVIEWING from APPROVED; PROCESSING from APPROVED or REVIEWING; DISBURSED runs disbursement (credit pool, repayment schedule, ACTIVE). Group loans only.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+    "/admin/groups/export": {
+      "get": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Export credit groups (JSON)",
+        "description": "Same filters as list; returns up to `limit` rows (default 5000) as JSON with Content-Disposition attachment.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search name, group id, display groupId, or initiator"
+          },
+          {
+            "name": "onboardingStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "PENDING_KYC",
+                "ONBOARDING",
+                "FLAGGED"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 5000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/groups": {
+      "get": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "List credit groups (admin)",
+        "description": "Paginated directory with initiator, member count, credit limit fields, and derived onboardingStatus for the admin Credit Groups table.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "onboardingStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "PENDING_KYC",
+                "ONBOARDING",
+                "FLAGGED"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Create credit group (admin)",
+        "description": "Same payload as `POST /groups` plus `createdByUserId` (existing user who becomes creator). Sends invites when `members` provided.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["status"],
+                "required": [
+                  "name",
+                  "description",
+                  "states",
+                  "expectedLoan",
+                  "createdByUserId"
+                ],
                 "properties": {
-                  "status": { "type": "string", "enum": ["REVIEWING", "PROCESSING", "DISBURSED"] }
+                  "createdByUserId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "states": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "expectedLoan": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "targetCredit": {
+                    "type": "number"
+                  },
+                  "minimumAmount": {
+                    "type": "number"
+                  },
+                  "maximumAmount": {
+                    "type": "number"
+                  },
+                  "members": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "fullName",
+                        "email"
+                      ],
+                      "properties": {
+                        "fullName": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "phone": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "OK" },
-          "400": { "description": "Invalid transition or not a group loan" },
-          "401": { "description": "Unauthorized" },
-          "403": { "description": "Admin access denied" },
-          "404": { "description": "Loan not found" }
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Validation or business rule"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/groups/{id}": {
+      "get": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Get credit group detail (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "type": "object"
+                    },
+                    "onboardingStatus": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "PENDING_KYC",
+                        "ONBOARDING",
+                        "FLAGGED"
+                      ]
+                    },
+                    "memberCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          },
+          "404": {
+            "description": "Group not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Update credit group (admin)",
+        "description": "Partial update: name, description, status, limits, targetCredit.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "INACTIVE",
+                      "PENDING"
+                    ]
+                  },
+                  "maximumAmount": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "minimumAmount": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "targetCredit": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          },
+          "404": {
+            "description": "Group not found"
+          }
+        }
+      }
+    },
+    "/admin/users/summary": {
+      "get": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Individual users KPIs (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalUsers": {
+                      "type": "integer"
+                    },
+                    "pendingKycUsers": {
+                      "type": "integer",
+                      "description": "PENDING, SUBMITTED, or RESUBMITTED"
+                    },
+                    "activeCreditUsers": {
+                      "type": "integer",
+                      "description": "creditStatus ACTIVE"
+                    },
+                    "usersInActiveGroup": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "List users (admin)",
+        "description": "Search by name, email, or user id. Optional kycStatus and creditStatus filters. Includes active group membership when present.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kycStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SUBMITTED",
+                "RESUBMITTED",
+                "FLAGGED",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
+          },
+          {
+            "name": "creditStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCKED",
+                "ACTIVE"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "tags": [
+          "Admin · Users & groups"
+        ],
+        "summary": "Get user detail (admin)",
+        "description": "Profile and memberships; excludes password and sensitive tokens.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/admin/loan-operations/summary": {
+      "get": {
+        "tags": [
+          "Admin · Loan operations"
+        ],
+        "summary": "Loan operations dashboard KPIs (admin)",
+        "description": "Cards: total ACTIVE loans, sum of amounts in APPROVED/REVIEWING/PROCESSING (pending disbursement), repayment rate (PAID / all installments), portfolio value (disbursed lifecycle loans). Change percentages are placeholders (0) until trend data exists.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalActiveLoans": {
+                      "type": "integer"
+                    },
+                    "totalActiveLoansChangePercent": {
+                      "type": "number"
+                    },
+                    "pendingDisbursementsValue": {
+                      "type": "number"
+                    },
+                    "pendingDisbursementsChangePercent": {
+                      "type": "number"
+                    },
+                    "repaymentRatePercent": {
+                      "type": "number"
+                    },
+                    "repaymentRateChangePercent": {
+                      "type": "number"
+                    },
+                    "totalPortfolioValue": {
+                      "type": "number"
+                    },
+                    "totalPortfolioValueChangePercent": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/loan-operations/loans": {
+      "get": {
+        "tags": [
+          "Admin · Loan operations"
+        ],
+        "summary": "Tabbed loan directory (admin)",
+        "description": "`tab`: pending_disbursement (APPROVED/REVIEWING/PROCESSING), active (ACTIVE), repayment_schedule (ACTIVE + installments), declined (REJECTED). Search matches borrower name/email, group name, or loan UUID. `disbursementReadiness` and `canDisburse` apply to pending group loans; `canDisburse` requires borrower loan PIN.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tab",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending_disbursement",
+                "active",
+                "repayment_schedule",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation (e.g. missing tab)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/loan-operations/export": {
+      "get": {
+        "tags": [
+          "Admin · Loan operations"
+        ],
+        "summary": "Export tabbed loan directory (JSON)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tab",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending_disbursement",
+                "active",
+                "repayment_schedule",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 5000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          }
+        }
+      }
+    },
+    "/admin/loans/{id}/disburse": {
+      "post": {
+        "tags": [
+          "Admin · Loan operations"
+        ],
+        "summary": "Execute disbursement (admin)",
+        "description": "Same as PATCH `/admin/loans/{id}/status` with DISBURSED: group loan only, mandates enforced in service. Requires borrower to have set a loan PIN (`canDisburse` on list).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan disbursed and moved to ACTIVE"
+          },
+          "400": {
+            "description": "PIN missing, wrong status, or mandate rules"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          },
+          "404": {
+            "description": "Loan not found"
+          }
+        }
+      }
+    },
+    "/admin/loan-requests": {
+      "get": {
+        "tags": [
+          "Admin · Loan operations"
+        ],
+        "summary": "List loan requests (admin)",
+        "description": "Paginated list of all loans. Optional filters: `status` (comma-separated LoanStatus), `dateFrom` and `dateTo` (ISO date, filters by createdAt). If `ADMIN_EMAILS` is set, the JWT user email must be in that list.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated statuses e.g. PENDING_APPROVAL,APPROVED"
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "loans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied (ADMIN_EMAILS)"
+          }
+        }
+      }
+    },
+    "/admin/loans/{id}/status": {
+      "patch": {
+        "tags": [
+          "Admin · Loan operations"
+        ],
+        "summary": "Set group loan admin workflow status",
+        "description": "REVIEWING from APPROVED; PROCESSING from APPROVED or REVIEWING; DISBURSED runs disbursement (credit pool, repayment schedule, ACTIVE). Group loans only.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "REVIEWING",
+                      "PROCESSING",
+                      "DISBURSED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Invalid transition or not a group loan"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Admin access denied"
+          },
+          "404": {
+            "description": "Loan not found"
+          }
         }
       }
     },
     "/admin/kyc/count": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin · KYC"
         ],
         "summary": "Count KYC records",
         "description": "Count user_kyc_data rows. Omit query params to count all. Optional `status` filters by users.kycStatus (User table). Optional `search` by user fullName or email.",
@@ -1682,14 +2847,26 @@
             "in": "query",
             "required": false,
             "description": "Filter by users.kycStatus (PENDING, SUBMITTED, RESUBMITTED, FLAGGED, APPROVED, REJECTED)",
-            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED", "FLAGGED", "APPROVED", "REJECTED"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SUBMITTED",
+                "RESUBMITTED",
+                "FLAGGED",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
           },
           {
             "name": "search",
             "in": "query",
             "required": false,
             "description": "Search by user fullName or email",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1700,20 +2877,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "count": { "type": "integer" }
+                    "count": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
             }
           },
-          "401": { "description": "Unauthorized" }
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
     "/admin/kyc": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin · KYC"
         ],
         "summary": "List KYC records",
         "description": "Returns all user_kyc_data rows when no filters. Optional `status` filters by users.kycStatus. Optional `search` by user fullName or email.",
@@ -1728,26 +2909,47 @@
             "in": "query",
             "required": false,
             "description": "Filter by users.kycStatus; omit to return all KYC records",
-            "schema": { "type": "string", "enum": ["PENDING", "SUBMITTED", "RESUBMITTED", "FLAGGED", "APPROVED", "REJECTED"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "SUBMITTED",
+                "RESUBMITTED",
+                "FLAGGED",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
           },
           {
             "name": "search",
             "in": "query",
             "required": false,
             "description": "Search by user fullName or email",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
           }
         ],
         "responses": {
@@ -1758,23 +2960,62 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "count": { "type": "integer", "description": "Total count matching filters" },
+                    "count": {
+                      "type": "integer",
+                      "description": "Total count matching filters"
+                    },
                     "items": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "kycId": { "type": "string", "format": "uuid", "description": "Unique KYC record ID (use for details and approve)" },
-                          "kycIdDisplay": { "type": "string", "description": "Display ID e.g. KYC-77210" },
-                          "userId": { "type": "string", "format": "uuid" },
-                          "fullName": { "type": "string" },
-                          "email": { "type": "string" },
-                          "kycStatus": { "type": "string", "description": "users.kycStatus" },
-                          "type": { "type": "string", "enum": ["Individual", "Group Member"] },
-                          "submissionDate": { "type": "string", "format": "date-time" },
-                          "documentStatus": { "type": "array", "items": { "type": "string" } },
-                          "riskScore": { "type": "number" },
-                          "comment": { "type": "string", "nullable": true }
+                          "kycId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "description": "Unique KYC record ID (use for details and approve)"
+                          },
+                          "kycIdDisplay": {
+                            "type": "string",
+                            "description": "Display ID e.g. KYC-77210"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "kycStatus": {
+                            "type": "string",
+                            "description": "users.kycStatus"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "Individual",
+                              "Group Member"
+                            ]
+                          },
+                          "submissionDate": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "documentStatus": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "riskScore": {
+                            "type": "number"
+                          },
+                          "comment": {
+                            "type": "string",
+                            "nullable": true
+                          }
                         }
                       }
                     }
@@ -1783,23 +3024,34 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" }
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
     "/admin/kyc/{kycId}": {
       "get": {
         "operationId": "getDetails",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Get KYC details",
         "description": "Get full KYC details by kycId. BVN value is not returned; only a bvnProvided flag. A user can have multiple KYC records.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "kycId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -1810,38 +3062,84 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "kycId": { "type": "string", "format": "uuid" },
-                    "kycIdDisplay": { "type": "string" },
+                    "kycId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kycIdDisplay": {
+                      "type": "string"
+                    },
                     "user": {
                       "type": "object",
                       "properties": {
-                        "userId": { "type": "string", "format": "uuid" },
-                        "fullName": { "type": "string" },
-                        "email": { "type": "string" },
-                        "submittedAt": { "type": "string", "format": "date-time", "nullable": true }
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "fullName": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
                       }
                     },
                     "kycData": {
                       "type": "object",
                       "properties": {
-                        "bioData": { "type": "object", "nullable": true },
-                        "contact": { "type": "object", "nullable": true },
-                        "employmentDetails": { "type": "object", "nullable": true },
-                        "ninData": { "type": "object", "nullable": true },
-                        "bvnProvided": { "type": "boolean" },
-                        "profilePicture": { "type": "string", "nullable": true }
+                        "bioData": {
+                          "type": "object",
+                          "nullable": true
+                        },
+                        "contact": {
+                          "type": "object",
+                          "nullable": true
+                        },
+                        "employmentDetails": {
+                          "type": "object",
+                          "nullable": true
+                        },
+                        "ninData": {
+                          "type": "object",
+                          "nullable": true
+                        },
+                        "bvnProvided": {
+                          "type": "boolean"
+                        },
+                        "profilePicture": {
+                          "type": "string",
+                          "nullable": true
+                        }
                       }
                     },
                     "verification": {
                       "type": "object",
                       "nullable": true,
                       "properties": {
-                        "ninApproved": { "type": "boolean" },
-                        "bvnApproved": { "type": "boolean" },
-                        "addressApproved": { "type": "boolean" },
-                        "creditHistoryApproved": { "type": "boolean" },
-                        "overallStatus": { "type": "string" },
-                        "comment": { "type": "string", "nullable": true }
+                        "ninApproved": {
+                          "type": "boolean"
+                        },
+                        "bvnApproved": {
+                          "type": "boolean"
+                        },
+                        "addressApproved": {
+                          "type": "boolean"
+                        },
+                        "creditHistoryApproved": {
+                          "type": "boolean"
+                        },
+                        "overallStatus": {
+                          "type": "string"
+                        },
+                        "comment": {
+                          "type": "string",
+                          "nullable": true
+                        }
                       }
                     }
                   }
@@ -1849,23 +3147,36 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" }
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "KYC record not found"
+          }
         }
       }
     },
     "/admin/kyc/{kycId}/approve": {
       "post": {
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Approve KYC",
         "description": "Approve KYC by kycId. Sets KYC record status to APPROVED, verification flags, and user kycStatus to APPROVED. Use kycId (not userId) because a user can have multiple KYC records.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "kycId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -1876,82 +3187,222 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": { "type": "string" }
+                    "message": {
+                      "type": "string"
+                    }
                   }
                 }
               }
             }
           },
-          "400": { "description": "KYC already approved or cannot approve rejected KYC" },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" }
+          "400": {
+            "description": "KYC already approved or cannot approve rejected KYC"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "KYC record not found"
+          }
         }
       }
     },
     "/admin/kyc/{kycId}/reject": {
       "post": {
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Reject KYC",
         "description": "Reject KYC by kycId. Optionally send comment in body for the user.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kycId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": { "type": "object", "properties": { "comment": { "type": "string" } } }
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" } } } } },
-          "400": { "description": "Cannot reject approved KYC" },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" }
+          "200": {
+            "400": {
+              "description": "Cannot reject approved KYC"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "404": {
+              "description": "KYC record not found"
+            },
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
-    }
-  },
+    },
     "/admin/kyc/{kycId}/verify/address": {
       "post": {
         "operationId": "verifyAddress",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Verify address",
         "description": "Verify address via third-party (Mono). Updates kyc_verifications.addressApproved.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kycId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "message": { "type": "string" } } } } },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" }
+          "200": {
+            "401": {
+              "description": "Unauthorized"
+            },
+            "404": {
+              "description": "KYC record not found"
+            },
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
-    }
-  },
+    },
     "/admin/kyc/{kycId}/verify/credit-history": {
       "post": {
         "operationId": "creditHistory",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Verify credit history",
         "description": "Verify credit history via third-party (Mono v3 BVN lookup). Updates kyc_verifications.creditHistoryApproved. If already verified, skips the API call to avoid cost. Requires BVN on the KYC record.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kycId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "message": { "type": "string" } } } } },
-          "400": { "description": "No BVN on KYC record or BVN decryption failed" },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" }
+          "200": {
+            "400": {
+              "description": "No BVN on KYC record or BVN decryption failed"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "404": {
+              "description": "KYC record not found"
+            },
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
-    }
-  },
+    },
     "/admin/kyc/{kycId}/statement": {
       "get": {
         "operationId": "fetchStatement",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Fetch statement",
         "description": "If statement exists in DB for this KYC's user, return it. Otherwise fetch via third-party (Mono), save to DB, and return.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kycId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1960,41 +3411,91 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "statement": { "type": "object" },
-                    "fromCache": { "type": "boolean" }
+                    "statement": {
+                      "type": "object"
+                    },
+                    "fromCache": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
             }
           },
-          "400": { "description": "No linked account to fetch statement" },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" },
-          "502": { "description": "Third-party statement fetch failed" }
+          "400": {
+            "description": "No linked account to fetch statement"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "KYC record not found"
+          },
+          "502": {
+            "description": "Third-party statement fetch failed"
+          }
         }
       }
     },
     "/admin/kyc/{kycId}/verify/nin": {
       "post": {
         "operationId": "verifyNin",
-        "tags": ["Admin"],
+        "tags": [
+          "Admin · KYC"
+        ],
         "summary": "Verify NIN",
         "description": "Verify NIN via third-party (Mono lookup). Updates kyc_verifications.ninApproved.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "kycId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kycId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" }, "message": { "type": "string" } } } } },
-          "400": { "description": "No NIN on KYC record" },
-          "401": { "description": "Unauthorized" },
-          "404": { "description": "KYC record not found" }
+          "200": {
+            "400": {
+              "description": "No NIN on KYC record"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "404": {
+              "description": "KYC record not found"
+            },
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
-    }
-  },
+    },
     "/groups": {
       "post": {
         "tags": [
-          "Groups"
+          "Users · Groups"
         ],
         "summary": "Create group",
         "description": "Creates a group with the caller as creator. Optionally include `members` to add members and send them invite emails (existing users get a group_member invite; new users get a pending group_invite until they sign up).",
@@ -2164,7 +3665,7 @@
     "/groups/{id}": {
       "get": {
         "tags": [
-          "Groups"
+          "Users · Groups"
         ],
         "summary": "Get group by ID",
         "security": [
@@ -2206,7 +3707,7 @@
     "/groups/{id}/invite": {
       "post": {
         "tags": [
-          "Groups"
+          "Users · Groups"
         ],
         "summary": "Invite members (creator only)",
         "security": [
@@ -2274,7 +3775,7 @@
     "/groups/{id}/exit": {
       "post": {
         "tags": [
-          "Groups"
+          "Users · Groups"
         ],
         "summary": "Request exit (sets status to ISOLATED)",
         "security": [
@@ -2316,7 +3817,7 @@
     "/groups/{id}/exit/final": {
       "post": {
         "tags": [
-          "Groups"
+          "Users · Groups"
         ],
         "summary": "Permanent exit (only when all group loans repaid)",
         "security": [
@@ -2358,12 +3859,26 @@
     "/groups/{groupId}/direct-debit-mandate": {
       "get": {
         "operationId": "getDirectDebitMandate",
-        "tags": ["Groups"],
+        "tags": [
+          "Users · Groups"
+        ],
         "summary": "Get my direct debit mandate for a group",
         "description": "Returns the current user's direct debit mandate for the group, if any. Required to be an active group member.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -2375,14 +3890,33 @@
                   "properties": {
                     "mandate": {
                       "oneOf": [
-                        { "type": "null" },
+                        {
+                          "type": "null"
+                        },
                         {
                           "type": "object",
                           "properties": {
-                            "id": { "type": "string", "format": "uuid" },
-                            "groupId": { "type": "string", "format": "uuid", "nullable": true },
-                            "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "FAILED"] },
-                            "createdAt": { "type": "string", "format": "date-time" }
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "groupId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ACTIVE",
+                                "INACTIVE",
+                                "FAILED"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
                           }
                         }
                       ]
@@ -2392,24 +3926,45 @@
               }
             }
           },
-          "403": { "description": "Not an active member of this group" }
+          "403": {
+            "description": "Not an active member of this group"
+          }
         }
       },
       "post": {
         "operationId": "createAndAuthorizeDirectDebitMandate",
-        "tags": ["Groups"],
+        "tags": [
+          "Users · Groups"
+        ],
         "summary": "Create mandate (if needed) and send BVN OTP",
         "description": "Ensures a direct debit mandate exists for the user and group (creates INACTIVE if none), then initiates Mono BVN verification and sends OTP to phone or email. Use mandate.id with the confirm endpoint. Optional body: { \"resend\": true } to count as resend (throttled once per 3 hours).",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "resend": { "type": "boolean", "default": false } }
+                "properties": {
+                  "resend": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
               }
             }
           }
@@ -2425,15 +3980,39 @@
                     "mandate": {
                       "type": "object",
                       "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "groupId": { "type": "string", "format": "uuid", "nullable": true },
-                        "status": { "type": "string" },
-                        "createdAt": { "type": "string", "format": "date-time" }
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "groupId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
                       }
                     },
-                    "ok": { "type": "boolean" },
-                    "message": { "type": "string" },
-                    "data": { "type": "object", "nullable": true, "properties": { "sessionId": { "type": "string" } } }
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "sessionId": {
+                          "type": "string"
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2442,19 +4021,35 @@
           "400": {
             "description": "Already have an active mandate, KYC/BVN missing, BVN init or OTP failed, mandate not INACTIVE, or resend throttled"
           },
-          "403": { "description": "Not an active member of this group" }
+          "403": {
+            "description": "Not an active member of this group"
+          }
         }
       }
     },
     "/groups/{groupId}/direct-debit-mandate/accounts": {
       "get": {
         "operationId": "listDirectDebitSavedAccounts",
-        "tags": ["Groups"],
+        "tags": [
+          "Users · Groups"
+        ],
         "summary": "List saved direct-debit accounts for this group",
         "description": "Returns bank accounts linked for the current user under the group's current lending mandate period (same shape as confirm response accounts), ordered by createdAt descending. Empty array unless the user's latest direct-debit mandate for this group is INPROGRESS or ACTIVE (BVN/accounts flow completed). Also empty if there is no current group mandate period, no member mandate, or no accounts saved. Requires active group membership.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -2466,27 +4061,53 @@
                   "properties": {
                     "accounts": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                      "items": {
+                        "$ref": "#/components/schemas/DebitLinkedAccount"
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "403": { "description": "Not an active member of this group" }
+          "403": {
+            "description": "Not an active member of this group"
+          }
         }
       }
     },
     "/groups/{groupId}/direct-debit-mandate/{mandateId}/confirm": {
       "post": {
         "operationId": "confirmDirectDebitMandate",
-        "tags": ["Groups"],
+        "tags": [
+          "Users · Groups"
+        ],
         "summary": "Confirm mandate with OTP and link accounts",
         "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. Response includes all successfully saved linked accounts (use account ids for refresh/verify). mandateId comes from POST /groups/{groupId}/direct-debit-mandate response. Mandate debit cap is derived server-side from the group (max of currentCreditPool and targetCredit; default 1,000,000 NGN if both are zero). Body: otp only.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "mandateId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "mandateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -2494,9 +4115,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["otp"],
+                "required": [
+                  "otp"
+                ],
                 "properties": {
-                  "otp": { "type": "string", "description": "OTP received after POST .../direct-debit-mandate" }
+                  "otp": {
+                    "type": "string",
+                    "description": "OTP received after POST .../direct-debit-mandate"
+                  }
                 }
               }
             }
@@ -2513,16 +4139,30 @@
                     "mandate": {
                       "type": "object",
                       "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "groupId": { "type": "string", "format": "uuid", "nullable": true },
-                        "status": { "type": "string" },
-                        "createdAt": { "type": "string", "format": "date-time" }
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "groupId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
                       }
                     },
                     "accounts": {
                       "type": "array",
                       "description": "All bank accounts successfully linked in this confirm call",
-                      "items": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                      "items": {
+                        "$ref": "#/components/schemas/DebitLinkedAccount"
+                      }
                     }
                   }
                 }
@@ -2532,21 +4172,47 @@
           "400": {
             "description": "Mandate not pending, authorize first, invalid OTP, no BVN accounts, no accounts could be linked via Mono, or Mono customer/create failed"
           },
-          "403": { "description": "Not your mandate" },
-          "404": { "description": "Mandate not found" }
+          "403": {
+            "description": "Not your mandate"
+          },
+          "404": {
+            "description": "Mandate not found"
+          }
         }
       }
     },
     "/groups/{groupId}/direct-debit-mandate/accounts/{accountId}": {
       "post": {
         "operationId": "getOrRefreshDebitAccountMandate",
-        "tags": ["Groups"],
+        "tags": [
+          "Users · Groups"
+        ],
         "summary": "Get or refresh Mono payment mandate for a linked account",
         "description": "Returns the debit account if status is ACTIVE, or if a mandate reference exists and was created less than 3 hours ago. Otherwise calls Mono POST /v3/payments/mandates (same shape as confirm flow), updates reference and initiateMandateData, and resets the account createdAt window. Account must belong to the group and the current user. accountId is returned from confirm (saved Account id).",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "accountId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -2556,29 +4222,61 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": { "type": "string" },
-                    "account": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                    "message": {
+                      "type": "string"
+                    },
+                    "account": {
+                      "$ref": "#/components/schemas/DebitLinkedAccount"
+                    }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Mono initiate failed or account missing bank link" },
-          "403": { "description": "Not your account or wrong group" },
-          "404": { "description": "Account not found" }
+          "400": {
+            "description": "Mono initiate failed or account missing bank link"
+          },
+          "403": {
+            "description": "Not your account or wrong group"
+          },
+          "404": {
+            "description": "Account not found"
+          }
         }
       }
     },
     "/groups/{groupId}/direct-debit-mandate/accounts/{accountId}/verify": {
       "post": {
         "operationId": "verifyDebitAccountMandate",
-        "tags": ["Groups"],
+        "tags": [
+          "Users · Groups"
+        ],
         "summary": "Verify direct debit mandate status with Mono",
         "description": "GET Mono v3/payments/mandates/{reference} using the account reference. If approved, sets the account status to ACTIVE. Returns 400 while mandate is still pending approval.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "groupId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "accountId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -2588,24 +4286,40 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": { "type": "string" },
-                    "data": { "type": "object", "additionalProperties": true, "description": "Mono mandate payload" }
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Mono mandate payload"
+                    }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Mandate pending approval or no reference" },
-          "403": { "description": "Not your account or wrong group" },
-          "404": { "description": "Account not found" },
-          "502": { "description": "Mono retrieve failed" }
+          "400": {
+            "description": "Mandate pending approval or no reference"
+          },
+          "403": {
+            "description": "Not your account or wrong group"
+          },
+          "404": {
+            "description": "Account not found"
+          },
+          "502": {
+            "description": "Mono retrieve failed"
+          }
         }
       }
     },
     "/loans/individual": {
       "get": {
         "operationId": "listIndividualLoans",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "List my individual loans",
         "description": "Returns loans where the authenticated user is the borrower and the loan is not tied to a group (`groupId` is null). Newest first.",
         "security": [
@@ -2636,7 +4350,9 @@
       },
       "post": {
         "operationId": "requestIndividualLoan",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "Request individual loan",
         "description": "Create an individual (non-group) loan for the authenticated user. Amount must not exceed the user's credit limit. Requires onboarding complete and loan PIN in body.",
         "security": [
@@ -2711,7 +4427,9 @@
     "/loans/group": {
       "get": {
         "operationId": "listGroupLoans",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "List my group loans",
         "description": "Returns all loans belonging to the authenticated user's active group(s). Use optional query param `status` to filter by loan outcome/status. Each item may include nested `group` and `borrower` objects. Newest first.",
         "security": [
@@ -2725,7 +4443,9 @@
             "in": "query",
             "required": false,
             "description": "Optional comma-separated loan statuses (e.g. APPROVED,ACTIVE).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2751,7 +4471,9 @@
       },
       "post": {
         "operationId": "requestGroupLoan",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "Request group loan",
         "description": "Create a group loan; all active group members must approve. Each approver must have an active direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
         "security": [
@@ -2834,7 +4556,9 @@
     "/loans/{id}": {
       "get": {
         "operationId": "getLoan",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "Get loan by ID",
         "description": "Return loan details. Allowed for the borrower or for a group member who is an approver for this loan.",
         "security": [
@@ -2876,16 +4600,25 @@
     "/loans/{id}/approve": {
       "post": {
         "operationId": "approveLoan",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "Approve a group loan",
         "description": "Record the caller's approval for a group loan. Only active group members can approve. For group loans, the approver must have an active direct debit mandate for the group (created and authorized within the last 12 months). If the approver has no running mandate, they must create and authorize direct debit on their account(s) before they can approve. Requires onboarding complete and request body with loanPin (4 digits). When all members have approved, the loan moves to APPROVED and is disbursed.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "requestBody": {
@@ -2894,9 +4627,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["loanPin"],
+                "required": [
+                  "loanPin"
+                ],
                 "properties": {
-                  "loanPin": { "type": "string", "pattern": "^\\d{4}$" }
+                  "loanPin": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  }
                 }
               }
             }
@@ -2907,7 +4645,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Loan" }
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
               }
             }
           },
@@ -2926,7 +4666,9 @@
     "/loans/{id}/institutional-approval": {
       "post": {
         "operationId": "institutionalApprovalCallback",
-        "tags": ["Loans"],
+        "tags": [
+          "Admin · Institutional lenders"
+        ],
         "summary": "Partner callback: continue after institutional approval",
         "description": "Called by partner/lender when an institutional group loan is approved. Moves loan from INSTITUTIONAL_PENDING to PENDING_APPROVAL and creates pending approval records for group members.",
         "security": [
@@ -2968,16 +4710,25 @@
     "/loans/{id}/reject": {
       "post": {
         "operationId": "rejectLoan",
-        "tags": ["Loans"],
+        "tags": [
+          "Users · Loans"
+        ],
         "summary": "Reject a group loan",
         "description": "Record the caller's rejection for a group loan. Only active group members can reject. Requires onboarding complete and loan PIN in body. Once any member rejects, the loan status becomes REJECTED.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "requestBody": {
@@ -2986,9 +4737,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["loanPin"],
+                "required": [
+                  "loanPin"
+                ],
                 "properties": {
-                  "loanPin": { "type": "string", "pattern": "^\\d{4}$" }
+                  "loanPin": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  }
                 }
               }
             }
@@ -2999,7 +4755,9 @@
             "description": "OK",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Loan" }
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
               }
             }
           },
@@ -3018,7 +4776,7 @@
     "/repayments": {
       "post": {
         "tags": [
-          "Repayments"
+          "Users · Repayments"
         ],
         "summary": "Record repayment (borrower only)",
         "security": [
@@ -3075,398 +4833,438 @@
     }
   },
   "components": {
-      "securitySchemes": {
-        "bearerAuth": {
-          "type": "http",
-          "scheme": "bearer",
-          "bearerFormat": "JWT",
-          "description": "JWT from login or signup"
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT from login or signup"
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string"
+          }
         }
       },
-      "schemas": {
-        "Health": {
-          "type": "object",
-          "properties": {
-            "ok": {
-              "type": "boolean"
-            },
-            "service": {
-              "type": "string"
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "employmentStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "monthlyIncome": {
+            "type": "number",
+            "nullable": true
+          },
+          "creditLimit": {
+            "type": "number"
+          },
+          "kycStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "creditStatus": {
+            "type": "string",
+            "enum": [
+              "LOCKED",
+              "ACTIVE"
+            ]
+          },
+          "trustScore": {
+            "type": "number"
+          },
+          "trustLevel": {
+            "type": "string",
+            "enum": [
+              "BRONZE",
+              "SILVER",
+              "GOLD"
+            ]
+          },
+          "pin": {
+            "type": "boolean",
+            "description": "True if the user has set a loan PIN, false otherwise"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "groups": {
+            "type": "array",
+            "description": "Group memberships (included on GET /auth/profile)",
+            "items": {
+              "$ref": "#/components/schemas/GroupMember"
             }
           }
-        },
-        "User": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "fullName": {
+        }
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "targetCredit": {
+            "type": "number"
+          },
+          "currentCreditPool": {
+            "type": "number"
+          },
+          "credibilityScore": {
+            "type": "number"
+          },
+          "credibilityLevel": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "VERIFIED_TRUST_GROUP"
+            ]
+          },
+          "quarterlyStartDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "quarterlyEndDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minimumAmount": {
+            "type": "number",
+            "nullable": true
+          },
+          "maximumAmount": {
+            "type": "number",
+            "nullable": true
+          },
+          "repaymentPeriod": {
+            "type": "integer",
+            "nullable": true
+          },
+          "repaymentType": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "interestType": {
+            "type": "string",
+            "enum": [
+              "flat",
+              "reducingBalance"
+            ],
+            "nullable": true
+          },
+          "interest": {
+            "type": "number",
+            "nullable": true
+          },
+          "penalCharges": {
+            "type": "number",
+            "nullable": true
+          },
+          "gracePeriod": {
+            "type": "integer",
+            "nullable": true
+          },
+          "gracePeriodType": {
+            "type": "string",
+            "nullable": true
+          },
+          "overGracePenalCharges": {
+            "type": "number",
+            "nullable": true
+          },
+          "ageRange": {
+            "type": "array",
+            "items": {
               "type": "string"
-            },
-            "email": {
+            }
+          },
+          "states": {
+            "type": "array",
+            "items": {
               "type": "string"
-            },
-            "phone": {
-              "type": "string",
-              "nullable": true
-            },
-            "location": {
-              "type": "string",
-              "nullable": true
-            },
-            "employmentStatus": {
-              "type": "string",
-              "nullable": true
-            },
-            "monthlyIncome": {
-              "type": "number",
-              "nullable": true
-            },
-            "creditLimit": {
-              "type": "number"
-            },
-            "kycStatus": {
-              "type": "string",
-              "enum": [
-                "PENDING",
-                "APPROVED",
-                "REJECTED"
-              ]
-            },
-            "creditStatus": {
-              "type": "string",
-              "enum": [
-                "LOCKED",
-                "ACTIVE"
-              ]
-            },
-            "trustScore": {
-              "type": "number"
-            },
-            "trustLevel": {
-              "type": "string",
-              "enum": [
-                "BRONZE",
-                "SILVER",
-                "GOLD"
-              ]
-            },
-            "pin": {
-              "type": "boolean",
-              "description": "True if the user has set a loan PIN, false otherwise"
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "groups": {
-              "type": "array",
-              "description": "Group memberships (included on GET /auth/profile)",
-              "items": {
-                "$ref": "#/components/schemas/GroupMember"
+            }
+          },
+          "expectedLoan": {
+            "type": "number",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "PENDING"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runningMandate": {
+            "type": "boolean",
+            "description": "On profile nested group: true if this user has an ACTIVE direct-debit mandate for this group within the last 12 months"
+          }
+        }
+      },
+      "GroupMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "CREATOR",
+              "MEMBER"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "INVITED",
+              "ACTIVE",
+              "ISOLATED",
+              "EXITED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "group": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Group"
               }
-            }
+            ],
+            "description": "Nested group details; includes runningMandate on GET /auth/profile"
           }
-        },
-        "Group": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "groupId": {
-              "type": "string",
-              "nullable": true
-            },
-            "name": {
-              "type": "string"
-            },
-            "targetCredit": {
-              "type": "number"
-            },
-            "currentCreditPool": {
-              "type": "number"
-            },
-            "credibilityScore": {
-              "type": "number"
-            },
-            "credibilityLevel": {
-              "type": "string",
-              "enum": [
-                "STANDARD",
-                "VERIFIED_TRUST_GROUP"
-              ]
-            },
-            "quarterlyStartDate": {
-              "type": "string",
-              "format": "date",
-              "nullable": true
-            },
-            "quarterlyEndDate": {
-              "type": "string",
-              "format": "date",
-              "nullable": true
-            },
-            "createdBy": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "minimumAmount": {
-              "type": "number",
-              "nullable": true
-            },
-            "maximumAmount": {
-              "type": "number",
-              "nullable": true
-            },
-            "repaymentPeriod": {
-              "type": "integer",
-              "nullable": true
-            },
-            "repaymentType": {
-              "type": "string",
-              "enum": [
-                "daily",
-                "weekly",
-                "monthly",
-                "quarterly",
-                "yearly"
-              ],
-              "nullable": true
-            },
-            "description": {
-              "type": "string",
-              "nullable": true
-            },
-            "interestType": {
-              "type": "string",
-              "enum": [
-                "flat",
-                "reducingBalance"
-              ],
-              "nullable": true
-            },
-            "interest": {
-              "type": "number",
-              "nullable": true
-            },
-            "penalCharges": {
-              "type": "number",
-              "nullable": true
-            },
-            "gracePeriod": {
-              "type": "integer",
-              "nullable": true
-            },
-            "gracePeriodType": {
-              "type": "string",
-              "nullable": true
-            },
-            "overGracePenalCharges": {
-              "type": "number",
-              "nullable": true
-            },
-            "ageRange": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "states": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "expectedLoan": {
-              "type": "number",
-              "nullable": true
-            },
-            "status": {
-              "type": "string",
-              "enum": [
-                "ACTIVE",
-                "INACTIVE",
-                "PENDING"
-              ]
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "runningMandate": {
-              "type": "boolean",
-              "description": "On profile nested group: true if this user has an ACTIVE direct-debit mandate for this group within the last 12 months"
-            }
+        }
+      },
+      "DebitLinkedAccount": {
+        "type": "object",
+        "description": "Bank account linked for group-year direct debit (accounts table)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mandateId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "memberMandateId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "monoCustomerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "initiateMandateData": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
-        },
-        "GroupMember": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "userId": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "groupId": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "role": {
-              "type": "string",
-              "enum": [
-                "CREATOR",
-                "MEMBER"
-              ]
-            },
-            "status": {
-              "type": "string",
-              "enum": [
-                "INVITED",
-                "ACTIVE",
-                "ISOLATED",
-                "EXITED"
-              ]
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "group": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Group"
-                }
-              ],
-              "description": "Nested group details; includes runningMandate on GET /auth/profile"
-            }
-          }
-        },
-        "DebitLinkedAccount": {
-          "type": "object",
-          "description": "Bank account linked for group-year direct debit (accounts table)",
-          "properties": {
-            "id": { "type": "string", "format": "uuid" },
-            "mandateId": { "type": "string", "format": "uuid" },
-            "memberMandateId": { "type": "string", "format": "uuid", "nullable": true },
-            "reference": { "type": "string", "nullable": true },
-            "monoCustomerId": { "type": "string", "nullable": true },
-            "accountNumber": { "type": "string", "nullable": true },
-            "bankCode": { "type": "string", "nullable": true },
-            "status": { "type": "string" },
-            "initiateMandateData": { "type": "object", "additionalProperties": true },
-            "createdAt": { "type": "string", "format": "date-time", "nullable": true },
-            "updatedAt": { "type": "string", "format": "date-time", "nullable": true }
-          }
-        },
-        "GroupLoan": {
-          "allOf": [
-            {
-              "$ref": "#/components/schemas/Loan"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "group": {
-                  "type": "object",
-                  "nullable": true,
-                  "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "name": { "type": "string" }
+        }
+      },
+      "GroupLoan": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Loan"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "group": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string"
                   }
                 }
               }
             }
-          ]
-        },
-        "Loan": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "borrowerId": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "groupId": {
-              "type": "string",
-              "format": "uuid",
-              "nullable": true
-            },
-            "mandateId": {
-              "type": "string",
-              "format": "uuid",
-              "nullable": true
-            },
-            "amount": {
-              "type": "number"
-            },
-            "interestRate": {
-              "type": "number"
-            },
-            "tenorMonths": {
-              "type": "integer"
-            },
-            "loanPurpose": {
-              "type": "string",
-              "enum": [
-                "PERSONAL",
-                "BUSINESS",
-                "EDUCATION",
-                "EMERGENCY",
-                "OTHER"
-              ],
-              "nullable": true
-            },
-            "status": {
-              "type": "string",
-              "enum": [
-                "REQUESTED",
-                "PENDING_APPROVAL",
-                "INSTITUTIONAL_PENDING",
-                "APPROVED",
-                "REVIEWING",
-                "PROCESSING",
-                "REJECTED",
-                "DISBURSED",
-                "ACTIVE",
-                "REPAID",
-                "DEFAULTED"
-              ]
-            },
-            "outstandingBalance": {
-              "type": "number"
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time"
-            }
+          }
+        ]
+      },
+      "Loan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "borrowerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "mandateId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number"
+          },
+          "interestRate": {
+            "type": "number"
+          },
+          "tenorMonths": {
+            "type": "integer"
+          },
+          "loanPurpose": {
+            "type": "string",
+            "enum": [
+              "PERSONAL",
+              "BUSINESS",
+              "EDUCATION",
+              "EMERGENCY",
+              "OTHER"
+            ],
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "PENDING_APPROVAL",
+              "INSTITUTIONAL_PENDING",
+              "APPROVED",
+              "REVIEWING",
+              "PROCESSING",
+              "REJECTED",
+              "DISBURSED",
+              "ACTIVE",
+              "REPAID",
+              "DEFAULTED"
+            ]
+          },
+          "outstandingBalance": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
     }
   }
+}

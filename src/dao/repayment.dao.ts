@@ -58,4 +58,13 @@ export class RepaymentDao {
       transaction
     });
   }
+
+  /** For admin loan dashboard repayment-rate KPI. */
+  async countTotalAndPaid(transaction?: Transaction): Promise<{ total: number; paid: number }> {
+    const [total, paid] = await Promise.all([
+      Repayment.count({ transaction }),
+      Repayment.count({ where: { status: RepaymentStatus.PAID }, transaction })
+    ]);
+    return { total, paid };
+  }
 }
