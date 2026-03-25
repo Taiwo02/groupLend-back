@@ -349,6 +349,18 @@ export class LoanDao {
   ): Promise<number> {
     const baseWhere = this.tabWhereForOperations(opts.tab);
     const term = opts.q?.trim();
+    // When there is no search term, we can count without joins at all.
+    // This avoids Sequelize alias quirks that can show up in generated COUNT(DISTINCT ...)
+    // queries when `include` is present.
+    if (!term) {
+      return Loan.count({
+        where: baseWhere,
+        distinct: true,
+        col: "id",
+        transaction
+      });
+    }
+
     let where: WhereOptions<Loan> = baseWhere;
     if (term) {
       const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(term);
@@ -364,7 +376,11 @@ export class LoanDao {
     return Loan.count({
       where,
       distinct: true,
-      col: "Loan.id",
+      // NOTE: When using `include`, Sequelize can misinterpret model-qualified
+      // column strings (e.g. "Loan.id") and generate an invalid alias like
+      // "Loan->Loan". Using a bare "id" avoids that and correctly counts
+      // distinct loans.
+      col: "id",
       include: [
         { association: "borrower", attributes: [], required: true },
         { association: "group", attributes: [], required: false }
