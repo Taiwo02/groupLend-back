@@ -243,6 +243,7 @@
           "Users · Auth"
         ],
         "summary": "Get current user profile",
+        "description": "Returns the full user object. Includes two computed fields: `userType` (`\"group\"` or `\"individual\"`, derived from active group membership) and `individualDirectDebitActive` (boolean, only present when `userType` is `\"individual\"`). Group members also get `groups[].group.runningMandate` to indicate active direct-debit mandate status per group.",
         "security": [
           {
             "bearerAuth": []
@@ -5196,6 +5197,15 @@
             "items": {
               "$ref": "#/components/schemas/GroupMember"
             }
+          },
+          "userType": {
+            "type": "string",
+            "enum": ["group", "individual"],
+            "description": "Derived on GET /auth/profile. 'group' = active member of a credit group; 'individual' = standalone user. Computed from current group_members state — never stale."
+          },
+          "individualDirectDebitActive": {
+            "type": "boolean",
+            "description": "Only present on GET /auth/profile when userType is 'individual'. True if the user's individual DirectDebitMandate is ACTIVE or INPROGRESS."
           }
         }
       },

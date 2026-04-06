@@ -163,6 +163,13 @@ export class AuthService {
       );
     }
 
+    // Derived userType: always accurate, never stale.
+    const userType = groupIds.length > 0 ? "group" : "individual";
+    (user as unknown as { setDataValue: (k: string, v: unknown) => void }).setDataValue(
+      "userType",
+      userType
+    );
+
     // For individual (non-group) users, expose whether their own direct debit mandate is set up.
     if (groupIds.length === 0) {
       const individualDdm = await this.directDebitMandateDao.findByUserOnly(userId);
