@@ -59,6 +59,17 @@ export class RepaymentDao {
     });
   }
 
+  /** Paid repayments for the given loan IDs, ordered by paidAt desc, capped at limit. */
+  findPaidByLoanIds(loanIds: string[], limit: number, transaction?: Transaction): Promise<Repayment[]> {
+    if (loanIds.length === 0) return Promise.resolve([]);
+    return Repayment.findAll({
+      where: { loanId: { [Op.in]: loanIds }, status: RepaymentStatus.PAID, paidAt: { [Op.ne]: null } },
+      order: [["paidAt", "DESC"]],
+      limit,
+      transaction
+    });
+  }
+
   /** For admin loan dashboard repayment-rate KPI. */
   async countTotalAndPaid(transaction?: Transaction): Promise<{ total: number; paid: number }> {
     const [total, paid] = await Promise.all([

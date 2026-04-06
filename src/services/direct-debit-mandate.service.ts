@@ -6,10 +6,12 @@ import { GroupDao } from "../dao/group.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
 import { MandateDao } from "../dao/mandate.dao.js";
 import { MemberMandateDao } from "../dao/member-mandate.dao.js";
+import { UserMandateDao } from "../dao/user-mandate.dao.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
-import { Account, DirectDebitMandate, Mandate } from "../models/index.js";
-import { AccountStatus, GroupMemberStatus, MandateStatus } from "../models/enums.js";
+import { Account, DirectDebitMandate, Mandate, UserMandate } from "../models/index.js";
+import { AccountStatus, GroupMandateStatus, GroupMemberStatus, MandateStatus } from "../models/enums.js";
+import { addLocalDays, addLocalMonths, toLocalDateYmd } from "../utils/mandate-period.js";
 import { HttpError } from "../utils/http-error.js";
 import { decryptBvn } from "../utils/encryption.js";
 import {
@@ -55,6 +57,7 @@ export class DirectDebitMandateService {
     private readonly userKycDataDao: UserKycDataDao,
     private readonly mandateDao: MandateDao,
     private readonly memberMandateDao: MemberMandateDao,
+    private readonly userMandateDao: UserMandateDao,
     private readonly accountDao: AccountDao
   ) {}
 
@@ -532,6 +535,295 @@ export class DirectDebitMandateService {
     const updated = await this.directDebitMandateDao.setActive(mandateId, MandateStatus.COMPLETED, transaction);
     return updated!;
   }
+
+  // ─── Individual (non-group) direct-debit methods ────────────────────────────
+
+  /** Get current user's individual direct-debit mandate (no groupId). Returns null if none. */
+  async getMandateForUser(userId: string): Promise<GetMandateResult | null> {
+    const mandate = await this.directDebitMandateDao.findByUserOnly(userId);
+    if (!mandate) return null;
+    return {
+      id: mandate.id,
+      groupId: null,
+      status: mandate.status,
+      createdAt: mandate.createdAt.toISOString()
+    };
+  }
+
+  /** List saved individual direct-debit accounts for the current user. */
+  async listSavedDebitAccountsForUser(userId: string): Promise<Record<string, unknown>[]> {
+    const ddm = await this.directDebitMandateDao.findByUserOnly(userId);
+    if (!ddm || !directDebitMandateAllowsListingAccounts(ddm.status)) return [];
+
+    await this.userMandateDao.expireForUser(userId);
+    const userMandate = await this.userMandateDao.findCurrentForUser(userId);
+    if (!userMandate) return [];
+
+    const rows = await this.accountDao.findByUserMandateIdOrderByCreatedDesc(userMandate.id);
+    return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a));
+  }
+
+  /**
+   * Create individual direct-debit mandate (INACTIVE) if needed, then send BVN OTP.
+   * Only one mandate per user without a group.
+   */
+  async createAndAuthorizeMandateForUser(
+    userId: string,
+    resend: boolean,
+    transaction?: Transaction
+  ): Promise<{ mandate: GetMandateResult; authorize: AuthorizeMandateResult }> {
+    let mandate = await this.directDebitMandateDao.findByUserOnly(userId);
+    if (!mandate) {
+      mandate = await this.directDebitMandateDao.create({ userId, groupId: null }, transaction);
+    } else if (mandate.status === MandateStatus.ACTIVE) {
+      if (this.isWithinYear(mandate.createdAt)) {
+        throw new HttpError(400, "You already have an active individual direct debit mandate");
+      }
+      mandate = await this.directDebitMandateDao.create({ userId, groupId: null }, transaction);
+    }
+
+    const authorize = await this.authorizeMandate(mandate.id, userId, resend, transaction);
+    return {
+      mandate: {
+        id: mandate.id,
+        groupId: null,
+        status: mandate.status,
+        createdAt: mandate.createdAt.toISOString()
+      },
+      authorize
+    };
+  }
+
+  /**
+   * Confirm individual direct-debit with OTP: verify OTP, fetch BVN accounts,
+   * create Mono payment mandates per account and save Account rows linked to UserMandate.
+   */
+  async confirmWithOtpForUser(
+    mandateId: string,
+    userId: string,
+    otp: string,
+    transaction?: Transaction
+  ): Promise<{ mandate: DirectDebitMandate; accounts: Account[] }> {
+    const mandate = await this.directDebitMandateDao.findById(mandateId, transaction);
+    if (!mandate) throw new HttpError(404, "Mandate not found");
+    if (mandate.userId !== userId) throw new HttpError(403, "Not your mandate");
+    if (mandate.groupId) throw new HttpError(400, "Use the group mandate confirm endpoint for group mandates");
+    if (mandate.status !== MandateStatus.INACTIVE) {
+      throw new HttpError(400, "Mandate is not pending confirmation");
+    }
+    if (!mandate.monoSessionId) throw new HttpError(400, "Authorize first (send OTP) before confirming");
+
+    const user = await this.userDao.findById(userId, transaction);
+    if (!user) throw new HttpError(404, "User not found");
+    const kyc = await this.userKycDataDao.findByUserId(userId, transaction);
+    const bvnEncrypted = kyc?.bvnEncrypted?.trim();
+    if (!bvnEncrypted) throw new HttpError(400, "Complete KYC with BVN before confirming");
+    let bvn: string;
+    try {
+      bvn = decryptBvn(bvnEncrypted);
+    } catch {
+      throw new HttpError(400, "Could not use stored BVN");
+    }
+
+    await this.userMandateDao.expireForUser(userId, transaction);
+    let userMandate = await this.userMandateDao.findCurrentForUser(userId, transaction);
+    if (!userMandate) {
+      const startDate = addLocalDays(new Date(), 25);
+      const endDate = addLocalMonths(startDate, 12);
+      const ymd = toLocalDateYmd(startDate).replace(/-/g, "");
+      userMandate = await this.userMandateDao.create(
+        {
+          userId,
+          year: Number.parseInt(ymd, 10),
+          totalAccessAmount: DirectDebitMandateService.toPositiveNgn(user.creditLimit) || 0,
+          startDate,
+          endDate,
+          status: GroupMandateStatus.ACTIVE
+        },
+        transaction
+      );
+    }
+
+    let monoCustomerId = mandate.monoCustomerId ?? user.monoCustomerId ?? null;
+    if (!monoCustomerId) {
+      const contact = (kyc?.contact ?? {}) as Record<string, unknown>;
+      const address = contact.addressLine1 as string | undefined;
+      const parts = (user.fullName || "User").trim().split(/\s+/);
+      const firstName = parts[0] ?? "User";
+      const lastName = parts.slice(1).join(" ") || firstName;
+      const customerRes = await createMonoCustomer({
+        bvn,
+        email: user.email,
+        firstName,
+        lastName,
+        address: address ?? user.location ?? undefined,
+        phone: user.phone ?? undefined
+      });
+      const custData = customerRes.data as Record<string, unknown> | undefined;
+      const existing = custData?.existing_customer as { id?: string } | undefined;
+      const newCustomerId = (existing?.id ?? custData?.id) as string | undefined;
+      if (!newCustomerId) {
+        throw new HttpError(400, (customerRes.message as string) ?? "Failed to create Mono customer");
+      }
+      monoCustomerId = newCustomerId;
+      await this.directDebitMandateDao.updateSessionAndResend(mandateId, { monoCustomerId }, transaction);
+      await user.update({ monoCustomerId }, { transaction });
+    }
+
+    if (!monoCustomerId) throw new HttpError(400, "Mono customer ID is required");
+
+    const bvnRes = await fetchBvnDetails(otp, mandate.monoSessionId);
+    if ((bvnRes.status as string) !== "successful") {
+      throw new HttpError(400, (bvnRes.message as string) ?? "Invalid OTP or BVN details failed");
+    }
+    const accountsData = (bvnRes.data as unknown[]) ?? [];
+    if (accountsData.length === 0) {
+      throw new HttpError(400, "No bank accounts returned from BVN lookup");
+    }
+
+    const amountNgn =
+      DirectDebitMandateService.toPositiveNgn(userMandate.totalAccessAmount) ||
+      DEFAULT_MAX_DEBIT_AMOUNT_NGN;
+    const amountKobo = Math.round(amountNgn * MANDATE_AMOUNT_BUFFER_RATIO * 100);
+    const startDate = formatDate(userMandate.startDate);
+    const endDateExtra = new Date(userMandate.endDate);
+    endDateExtra.setDate(endDateExtra.getDate() + MANDATE_END_DAYS_EXTRA);
+    const endDate = formatDate(endDateExtra);
+
+    const createdAccounts: Account[] = [];
+    for (const item of accountsData) {
+      const el = item as Record<string, unknown>;
+      const accountNumber = el.account_number as string | undefined;
+      const institution = el.institution as Record<string, unknown> | undefined;
+      const bankCode = institution?.bank_code as string | undefined;
+      if (!accountNumber || !bankCode) continue;
+      const reference = "MONO" + randomBytes(8).toString("hex");
+      const mandateRes = await createPaymentMandate({
+        monoCustomerId,
+        accountNumber,
+        bankCode,
+        amountKobo,
+        startDate,
+        endDate,
+        reference,
+        description: "Credit repayment"
+      });
+      if ((mandateRes.status as string) === "successful") {
+        const data = mandateRes.data as Record<string, unknown> | undefined;
+        const row = await this.accountDao.create(
+          {
+            userMandateId: userMandate.id,
+            memberMandateId: null,
+            reference: (data?.reference as string) ?? reference,
+            monoCustomerId,
+            accountNumber,
+            bankCode,
+            status: AccountStatus.ACTIVE,
+            initiateMandateData: data ?? {}
+          },
+          transaction
+        );
+        createdAccounts.push(row);
+      }
+    }
+
+    if (createdAccounts.length === 0) {
+      throw new HttpError(400, "No bank accounts could be linked; check Mono mandate responses");
+    }
+
+    const updated = await this.directDebitMandateDao.setActive(mandateId, MandateStatus.INPROGRESS, transaction);
+    return { mandate: updated!, accounts: createdAccounts };
+  }
+
+  /** Get or refresh an individual user's account mandate (no group membership check). */
+  async getOrRefreshAccountMandateForUser(
+    userId: string,
+    accountId: string
+  ): Promise<{ message: string; account: Record<string, unknown> }> {
+    const account = await this.accountDao.findByIdWithUserMandate(accountId);
+    if (!account) throw new HttpError(404, "Record not found");
+
+    const userMandate = (account as Account & { userMandate?: UserMandate }).userMandate;
+    if (!userMandate || userMandate.userId !== userId) {
+      throw new HttpError(403, "Account is not linked to your individual mandate");
+    }
+
+    const maxAgeMs = ACCOUNT_MANDATE_REFRESH_HOURS * 60 * 60 * 1000;
+    const referenceFresh = !!account.reference && Date.now() - new Date(account.createdAt).getTime() < maxAgeMs;
+    if (account.status === AccountStatus.ACTIVE || referenceFresh) {
+      return { message: "Record", account: DirectDebitMandateService.serializeDebitAccount(account) };
+    }
+
+    if (!account.monoCustomerId || !account.accountNumber || !account.bankCode) {
+      throw new HttpError(400, "Account is missing bank link details; complete direct-debit confirmation first");
+    }
+
+    const amountNgn =
+      DirectDebitMandateService.toPositiveNgn(userMandate.totalAccessAmount) || DEFAULT_MAX_DEBIT_AMOUNT_NGN;
+    const amountKobo = Math.round(amountNgn * MANDATE_AMOUNT_BUFFER_RATIO * 100);
+    const startDate = formatDate(userMandate.startDate);
+    const endExtra = new Date(userMandate.endDate);
+    endExtra.setDate(endExtra.getDate() + MANDATE_END_DAYS_EXTRA);
+    const endDate = formatDate(endExtra);
+    const reference = "MONO" + randomBytes(8).toString("hex");
+
+    const mandateRes = await createPaymentMandate({
+      monoCustomerId: account.monoCustomerId,
+      accountNumber: account.accountNumber,
+      bankCode: account.bankCode,
+      amountKobo,
+      startDate,
+      endDate,
+      reference,
+      description: "Credit repayment"
+    });
+
+    if ((mandateRes.status as string) !== "successful") {
+      throw new HttpError(400, (mandateRes.message as string) ?? "Failed to initiate mandate");
+    }
+
+    const resData = (mandateRes.data as Record<string, unknown>) ?? {};
+    await this.accountDao.updateMandateInitiation(accountId, {
+      reference: (resData.reference as string) || reference,
+      initiateMandateData: { ...resData, ...mandateRes }
+    });
+    const refreshed = await this.accountDao.findById(accountId);
+    if (!refreshed) throw new HttpError(500, "Account not found after update");
+    return { message: "Record fetched", account: DirectDebitMandateService.serializeDebitAccount(refreshed) };
+  }
+
+  /** Poll Mono for individual account mandate approval; marks account ACTIVE when approved. */
+  async verifyAccountMandateForUser(
+    userId: string,
+    accountId: string
+  ): Promise<{ message: string; data: Record<string, unknown> | null }> {
+    const account = await this.accountDao.findByIdWithUserMandate(accountId);
+    if (!account) throw new HttpError(404, "Record not found");
+
+    const userMandate = (account as Account & { userMandate?: UserMandate }).userMandate;
+    if (!userMandate || userMandate.userId !== userId) {
+      throw new HttpError(403, "Account is not linked to your individual mandate");
+    }
+
+    if (!account.reference?.trim()) {
+      throw new HttpError(400, "No mandate reference; call refresh mandate first");
+    }
+
+    const remote = await retrievePaymentMandate(account.reference);
+    if (!remote) throw new HttpError(502, "Could not verify mandate with payment provider");
+
+    const approved =
+      remote.approved === true ||
+      remote.approved === "true" ||
+      String(remote.status ?? "").toLowerCase() === "approved";
+
+    if (!approved) return { message: "Mandate pending approval", data: null };
+
+    await this.accountDao.updateStatus(accountId, AccountStatus.ACTIVE);
+    return { message: "Mandate approved", data: remote };
+  }
+
+  // ─── Private helpers ─────────────────────────────────────────────────────────
 
   /** Max direct-debit coverage from group credit: higher of pool and target, else default. */
   private resolveGroupMaxDebitNgn(group: { currentCreditPool: unknown; targetCredit: unknown }): number {

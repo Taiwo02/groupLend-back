@@ -23,6 +23,7 @@ import { LoanApprovalDao } from "./dao/loan-approval.dao.js";
 import { LoanDao } from "./dao/loan.dao.js";
 import { MandateDao } from "./dao/mandate.dao.js";
 import { MemberMandateDao } from "./dao/member-mandate.dao.js";
+import { UserMandateDao } from "./dao/user-mandate.dao.js";
 import { AccountDao } from "./dao/account.dao.js";
 import { NotificationDao } from "./dao/notification.dao.js";
 import { RepaymentDao } from "./dao/repayment.dao.js";
@@ -72,6 +73,7 @@ function createContainer() {
   const directDebitMandateDao = new DirectDebitMandateDao();
   const mandateDao = new MandateDao();
   const memberMandateDao = new MemberMandateDao();
+  const userMandateDao = new UserMandateDao();
   const accountDao = new AccountDao();
 
   const creditService = new CreditService(groupMemberDao, userDao, userKycDataDao, groupDao);
@@ -96,6 +98,7 @@ function createContainer() {
     loanApprovalDao,
     mandateDao,
     memberMandateDao,
+    userMandateDao,
     repaymentDao,
     userKycDataDao,
     directDebitMandateDao,
@@ -131,6 +134,7 @@ function createContainer() {
     userKycDataDao,
     mandateDao,
     memberMandateDao,
+    userMandateDao,
     accountDao
   );
   const invitationService = new InvitationService(
@@ -158,7 +162,9 @@ function createContainer() {
     groupDao,
     statementDao,
     repaymentDao,
-    notificationDao
+    notificationDao,
+    userMandateDao,
+    directDebitMandateDao
   );
   const adminDashboardService = new AdminDashboardService(loanDao, userDao, userKycDataDao, repaymentDao);
   const adminKycService = new AdminKycService(userDao, userKycDataDao, kycVerificationDao, statementDao);

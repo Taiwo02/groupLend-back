@@ -7,10 +7,11 @@ import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
 import { LoanDao } from "../dao/loan.dao.js";
 import { MandateDao } from "../dao/mandate.dao.js";
 import { MemberMandateDao } from "../dao/member-mandate.dao.js";
+import { UserMandateDao } from "../dao/user-mandate.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
-import { Loan, Mandate } from "../models/index.js";
+import { Loan, Mandate, UserMandate } from "../models/index.js";
 import {
   ApprovalDecision,
   CredibilityLevel,
@@ -54,6 +55,7 @@ export class LoanService {
     private readonly loanApprovalDao: LoanApprovalDao,
     private readonly mandateDao: MandateDao,
     private readonly memberMandateDao: MemberMandateDao,
+    private readonly userMandateDao: UserMandateDao,
     private readonly repaymentDao: RepaymentDao,
     private readonly userKycDataDao: UserKycDataDao,
     private readonly directDebitMandateDao: DirectDebitMandateDao,
@@ -69,11 +71,34 @@ export class LoanService {
     if (input.amount > availableLimit) throw new HttpError(400, "Amount exceeds credit limit");
 
     return this.dbDao.withTransaction(async (transaction) => {
+      await this.userMandateDao.expireForUser(input.borrowerId, transaction);
+      let userMandate = await this.userMandateDao.findCurrentForUser(input.borrowerId, transaction);
+      if (!userMandate) {
+        userMandate = await this.ensureMandateForUser(input.borrowerId, transaction);
+      }
+
+      const totalAccessAmount = toNumber(userMandate.totalAccessAmount);
+      const usedAmount = await this.loanDao.sumDisbursedAmountByUserMandateId(
+        userMandate.id,
+        transaction
+      );
+      const maxAmount = totalAccessAmount - usedAmount;
+      if (input.amount > maxAmount) {
+        throw new HttpError(400, "Amount exceeds your individual access amount for this mandate period", {
+          maxAmount: Number(maxAmount.toFixed(2)),
+          mandateEndDate:
+            typeof userMandate.endDate === "string"
+              ? (userMandate.endDate as string).slice(0, 10)
+              : toLocalDateYmd(userMandate.endDate instanceof Date ? userMandate.endDate : new Date(userMandate.endDate))
+        });
+      }
+
       const totalPayable = this.computeTotalPayable(input.amount, input.interestRate, input.tenorMonths);
       const loan = await this.loanDao.createLoan(
         {
           borrowerId: input.borrowerId,
           groupId: null,
+          userMandateId: userMandate.id,
           amount: input.amount,
           interestRate: input.interestRate,
           tenorMonths: input.tenorMonths,
@@ -261,6 +286,83 @@ export class LoanService {
       );
     }
     return mandate;
+  }
+
+  /**
+   * Create a new individual mandate period: starts local today + 25 days, ends 12 calendar months after start.
+   * totalAccessAmount = 40% of user's annual income (same ratio as group mandate per-member calculation).
+   */
+  async ensureMandateForUser(userId: string, transaction: Transaction): Promise<UserMandate> {
+    const user = await this.userDao.findById(userId, transaction);
+    if (!user) throw new HttpError(404, "User not found");
+
+    const kycIncomes = await this.userKycDataDao.findEffectiveEmploymentIncomeByUserIds(
+      [userId],
+      transaction
+    );
+    const fromUser = toNumber(user.monthlyIncome ?? 0);
+    const fromKyc = kycIncomes.get(userId) ?? 0;
+    const monthlyIncome = fromUser > 0 ? fromUser : fromKyc;
+    const totalAccessAmount = Number(
+      (ACCESS_INCOME_RATIO * MONTHS_PER_YEAR * monthlyIncome).toFixed(2)
+    );
+
+    const startDate = addLocalDays(new Date(), 25);
+    const endDate = addLocalMonths(startDate, 12);
+    const ymd = toLocalDateYmd(startDate).replace(/-/g, "");
+    const yearSlot = Number.parseInt(ymd, 10);
+
+    return this.userMandateDao.create(
+      {
+        userId,
+        year: yearSlot,
+        totalAccessAmount,
+        startDate,
+        endDate,
+        status: GroupMandateStatus.ACTIVE
+      },
+      transaction
+    );
+  }
+
+  /** Individual activity feed: the authenticated user's own loan requests + repayments, newest first. */
+  async getMyActivity(
+    userId: string,
+    limit: number
+  ): Promise<
+    Array<{
+      type: "loan_requested" | "repayment";
+      at: string;
+      summary: string;
+      amount: number | null;
+      loanId: string | null;
+    }>
+  > {
+    const loans = await this.loanDao.findIndividualByBorrowerId(userId);
+    const recentLoans = loans.slice(0, limit).map((l) => ({
+      type: "loan_requested" as const,
+      at: l.createdAt.toISOString(),
+      summary: `Loan request — ${l.status}`,
+      amount: toNumber(l.amount),
+      loanId: l.id
+    }));
+
+    const repayments = await this.repaymentDao.findPaidByLoanIds(
+      loans.map((l) => l.id),
+      limit
+    );
+    const fromRepayments = repayments.map((r) => ({
+      type: "repayment" as const,
+      at: r.paidAt!.toISOString(),
+      summary: "Repayment",
+      amount: toNumber(r.amount),
+      loanId: r.loanId
+    }));
+
+    const merged = [...recentLoans, ...fromRepayments].sort(
+      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
+    );
+    return merged.slice(0, limit);
   }
 
   /** Mock: push to partner lender queue. In production would call external service. */

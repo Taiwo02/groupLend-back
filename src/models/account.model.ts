@@ -9,13 +9,17 @@ import { sequelize } from "../config/database.js";
 import { AccountStatus } from "./enums.js";
 
 /**
- * Bank account where direct debit is set. Linked to a group Mandate and
- * optionally to a MemberMandate (the member whose account this is).
+ * Bank account where direct debit is set.
+ * Group members: mandateId (group Mandate) + memberMandateId set; userMandateId null.
+ * Individual users: userMandateId (UserMandate) set; mandateId + memberMandateId null.
  */
 export class Account extends Model<InferAttributes<Account>, InferCreationAttributes<Account>> {
   declare id: CreationOptional<string>;
-  declare mandateId: string;
+  /** Group mandate FK — set for group members, null for individual direct-debit accounts. */
+  declare mandateId: string | null;
   declare memberMandateId: string | null;
+  /** Individual mandate FK — set for individual users, null for group members. */
+  declare userMandateId: string | null;
   declare reference: string | null;
   declare monoCustomerId: string | null;
   declare accountNumber: string | null;
@@ -37,9 +41,13 @@ Account.init(
     },
     mandateId: {
       type: DataTypes.UUID,
-      allowNull: false
+      allowNull: true
     },
     memberMandateId: {
+      type: DataTypes.UUID,
+      allowNull: true
+    },
+    userMandateId: {
       type: DataTypes.UUID,
       allowNull: true
     },

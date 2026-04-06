@@ -17,6 +17,7 @@ export class LoanDao {
       borrowerId: string;
       groupId: string | null;
       mandateId?: string | null;
+      userMandateId?: string | null;
       amount: number;
       interestRate: number;
       tenorMonths: number;
@@ -87,13 +88,25 @@ export class LoanDao {
     });
   }
 
-  /** Sum of principal amounts of loans under this mandate that are disbursed/active/repaid/defaulted. */
+  /** Sum of principal amounts of loans under this group mandate that are disbursed/active/repaid/defaulted. */
   async sumDisbursedAmountByMandateId(
     mandateId: string,
     transaction?: Transaction
   ): Promise<number> {
     const result = await Loan.sum("amount", {
       where: { mandateId, status: { [Op.in]: DISBURSED_STATUSES } },
+      transaction
+    });
+    return Number(result ?? 0);
+  }
+
+  /** Sum of principal amounts of individual loans under a user mandate that are disbursed/active/repaid/defaulted. */
+  async sumDisbursedAmountByUserMandateId(
+    userMandateId: string,
+    transaction?: Transaction
+  ): Promise<number> {
+    const result = await Loan.sum("amount", {
+      where: { userMandateId, status: { [Op.in]: DISBURSED_STATUSES } },
       transaction
     });
     return Number(result ?? 0);

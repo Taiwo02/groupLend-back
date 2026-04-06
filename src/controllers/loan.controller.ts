@@ -95,4 +95,12 @@ export class LoanController {
     const loan = await this.loanService.continueInstitutionalLoan(params.id);
     return c.json(loan);
   }
+
+  /** GET /loans/activity — current user's own activity (loans + repayments), newest first. */
+  async getMyActivity(c: Context): Promise<Response> {
+    const limitRaw = c.req.query("limit");
+    const limit = Math.min(50, Math.max(1, limitRaw ? parseInt(limitRaw, 10) : 20));
+    const items = await this.loanService.getMyActivity(c.get("userId"), limit);
+    return c.json({ activity: items, limit });
+  }
 }

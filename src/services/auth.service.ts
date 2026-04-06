@@ -151,6 +151,7 @@ export class AuthService {
     const groupIds = memberships
       .map((m) => m.group?.id)
       .filter((id): id is string => id != null);
+
     const runningGroupIds =
       await this.directDebitMandateDao.findRunningMandateGroupIdsForUser(userId, groupIds);
     for (const m of memberships) {
@@ -159,6 +160,17 @@ export class AuthService {
       (grp as unknown as { setDataValue: (k: string, v: boolean) => void }).setDataValue(
         "runningMandate",
         runningGroupIds.has(grp.id)
+      );
+    }
+
+    // For individual (non-group) users, expose whether their own direct debit mandate is set up.
+    if (groupIds.length === 0) {
+      const individualDdm = await this.directDebitMandateDao.findByUserOnly(userId);
+      const individualDirectDebitActive =
+        individualDdm?.status === "ACTIVE" || individualDdm?.status === "INPROGRESS";
+      (user as unknown as { setDataValue: (k: string, v: unknown) => void }).setDataValue(
+        "individualDirectDebitActive",
+        individualDirectDebitActive
       );
     }
 

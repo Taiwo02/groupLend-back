@@ -6,11 +6,34 @@ import { UserDao } from "../dao/user.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { NotificationDao } from "../dao/notification.dao.js";
-import { ApprovalDecision, KycStatus, LoanStatus } from "../models/enums.js";
+import { UserMandateDao } from "../dao/user-mandate.dao.js";
+import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao.js";
+import { ApprovalDecision, KycStatus, LoanStatus, MandateStatus } from "../models/enums.js";
 import { toNumber } from "../utils/number.js";
 import { HttpError } from "../utils/http-error.js";
 import type { User } from "../models/index.js";
 import type { Statement } from "../models/index.js";
+
+/** Individual (non-group) user onboarding checklist. */
+export type IndividualOnboarding = {
+  revenueEntered: RevenueStatus;
+  kycComplete: KycCompleteStatus;
+  bankStatement: BankStatementStatus;
+  directDebitSetup: boolean;
+  /** Individual access amount = 40% of annual income. */
+  accessAmount: number;
+};
+
+/** Current individual mandate period info shown on the dashboard. */
+export type IndividualMandateInfo = {
+  id: string;
+  status: "ACTIVE" | "EXPIRED";
+  totalAccessAmount: number;
+  usedAmount: number;
+  remainingAccess: number;
+  startDate: string;
+  endDate: string;
+};
 
 // --- Onboarding view (some or all have not completed KYC) ---
 export type RevenueStatus = "verified" | "pending";
@@ -78,6 +101,11 @@ export type BadgeProgress = {
 // --- Unified dashboard response ---
 export type DashboardData = {
   view: "onboarding" | "full";
+  /**
+   * Whether this is a group member ("group") or standalone individual ("individual").
+   * Clients use this to choose between group-pool widgets and individual-mandate widgets.
+   */
+  userType: "group" | "individual";
   user: {
     fullName: string;
     memberIdDisplay: string;
@@ -87,6 +115,8 @@ export type DashboardData = {
   groupHealthPercent: number;
   allKycComplete: boolean;
   groupOnboarding: GroupOnboarding | null;
+  /** Onboarding checklist for individual (non-group) users. Null for group members. */
+  individualOnboarding: IndividualOnboarding | null;
   availableCreditPool: number;
   creditPoolUtilizationPercent: number;
   personalLimit: number;
@@ -101,12 +131,14 @@ export type DashboardData = {
   groupPoolStatus: Array<{ groupId: string; groupName: string; currentPool: number }>;
   credibilityScore: number | null;
   creditEligibility: number;
-  /** Deadline (e.g. group quarterly end); null if not set. */
+  /** Deadline (e.g. group quarterly end); null if not set or not a group member. */
   deadline: string | null;
   /** Projected amount (group target credit / goal). */
   projectedAmount: number;
-  /** Members who have not yet accepted the group invite. */
+  /** Members who have not yet accepted the group invite. Empty for individual users. */
   nonAcceptedMemberships: NonAcceptedMembership[];
+  /** Current individual mandate period. Null for group members. */
+  individualMandate: IndividualMandateInfo | null;
 };
 
 function memberIdDisplay(userId: string): string {
@@ -155,7 +187,9 @@ export class DashboardService {
     private readonly groupDao: GroupDao,
     private readonly statementDao: StatementDao,
     private readonly repaymentDao: RepaymentDao,
-    private readonly notificationDao: NotificationDao
+    private readonly notificationDao: NotificationDao,
+    private readonly userMandateDao: UserMandateDao,
+    private readonly directDebitMandateDao: DirectDebitMandateDao
   ) {}
 
   async getDashboard(userId: string): Promise<DashboardData> {
@@ -163,43 +197,72 @@ export class DashboardService {
     if (!user) throw new HttpError(404, "User not found");
 
     const groupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId);
+    const isGroupMember = groupIds.length > 0;
+    const userType: "group" | "individual" = isGroupMember ? "group" : "individual";
+
     const [groupPoolStatus, groupOnboarding, activeLoans, pendingApprovalsCount, pendingPeerApprovals, recentActivity, nonAcceptedMemberships] =
       await Promise.all([
         this.getGroupPoolStatus(userId),
-        groupIds.length > 0 ? this.getGroupOnboarding(groupIds[0], userId) : Promise.resolve(null),
+        isGroupMember ? this.getGroupOnboarding(groupIds[0], userId) : Promise.resolve(null),
         this.getActiveLoansCount(userId),
         this.getPendingApprovalsCount(userId),
         this.getPendingPeerApprovals(userId),
         this.getRecentActivity(userId),
-        groupIds.length > 0 ? this.getNonAcceptedMemberships(groupIds) : Promise.resolve([])
+        isGroupMember ? this.getNonAcceptedMemberships(groupIds) : Promise.resolve([])
       ]);
 
-    const allKycComplete = groupOnboarding ? groupOnboarding.creditStatus === "unlocked" : groupPoolStatus.length === 0;
+    // For group members: KYC completeness is driven by whether all members are onboarded.
+    // For individuals: it is simply whether their own KYC is approved.
+    const allKycComplete = isGroupMember
+      ? (groupOnboarding ? groupOnboarding.creditStatus === "unlocked" : false)
+      : user.kycStatus === KycStatus.APPROVED;
+
     const view = allKycComplete ? "full" : "onboarding";
-    const firstGroup = groupIds.length > 0 ? await this.groupDao.findById(groupIds[0]) : null;
+
+    const firstGroup = isGroupMember ? await this.groupDao.findById(groupIds[0]) : null;
     const availableCreditPool = firstGroup ? toNumber(firstGroup.currentCreditPool) : 0;
     const projectedGroupLimit = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
     const deadline = firstGroup?.quarterlyEndDate
       ? new Date(firstGroup.quarterlyEndDate).toISOString()
       : null;
     const projectedAmount = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
-    const creditPoolUtilizationPercent = projectedGroupLimit > 0 ? Math.round((availableCreditPool / projectedGroupLimit) * 100) : 0;
-    const credibilityScore = groupPoolStatus.length > 0 ? await this.getMaxGroupCredibility(userId) : null;
+    const creditPoolUtilizationPercent =
+      projectedGroupLimit > 0 ? Math.round((availableCreditPool / projectedGroupLimit) * 100) : 0;
+    const credibilityScore = isGroupMember ? await this.getMaxGroupCredibility(userId) : null;
     const creditEligibility = toNumber(user.creditLimit);
     const trustBadge = this.trustLevelToBadge(user.trustLevel);
     const badgeProgress = this.getBadgeProgress(user.trustScore, user.trustLevel);
 
+    // Individual-specific sections
+    const individualOnboarding = !isGroupMember
+      ? await this.getIndividualOnboarding(userId, user)
+      : null;
+    const individualMandate = !isGroupMember
+      ? await this.getIndividualMandateInfo(userId)
+      : null;
+
+    // Group health: % of members ready; for individuals: 100 if KYC done, else based on their own steps.
+    const groupHealthPercent = isGroupMember
+      ? groupOnboarding
+        ? Math.round((groupOnboarding.membersReady / groupOnboarding.membersTotal) * 100)
+        : 0
+      : user.kycStatus === KycStatus.APPROVED
+        ? 100
+        : Math.round(((user.kycStep ?? 0) / 3) * 100);
+
     return {
       view,
+      userType,
       user: {
         fullName: user.fullName,
         memberIdDisplay: memberIdDisplay(user.id),
         trustLevel: user.trustLevel,
         currentBalance: 0
       },
-      groupHealthPercent: groupOnboarding ? Math.round((groupOnboarding.membersReady / groupOnboarding.membersTotal) * 100) : 100,
+      groupHealthPercent,
       allKycComplete,
       groupOnboarding,
+      individualOnboarding,
       availableCreditPool,
       creditPoolUtilizationPercent,
       personalLimit: creditEligibility,
@@ -210,13 +273,17 @@ export class DashboardService {
       pendingApprovalsCount,
       pendingPeerApprovals,
       recentActivity,
-      earnBonusPoints: { description: "Invite a trusted peer to join and boost your Badge of Honor score.", invitePoints: 50 },
+      earnBonusPoints: {
+        description: "Invite a trusted peer to join and boost your Badge of Honor score.",
+        invitePoints: 50
+      },
       groupPoolStatus,
       credibilityScore,
       creditEligibility,
       deadline,
       projectedAmount,
-      nonAcceptedMemberships
+      nonAcceptedMemberships,
+      individualMandate
     };
   }
 
@@ -400,6 +467,56 @@ export class DashboardService {
     return Loan.count({
       where: { id: loanIds, status: LoanStatus.PENDING_APPROVAL }
     });
+  }
+
+  /** Onboarding checklist for a standalone (non-group) user. */
+  private async getIndividualOnboarding(userId: string, user: User): Promise<IndividualOnboarding> {
+    const [statement, ddMandate] = await Promise.all([
+      this.statementDao.findByUserId(userId),
+      this.directDebitMandateDao.findByUserOnly(userId)
+    ]);
+    const revenueEntered = getRevenueStatus(user);
+    const kycComplete = getKycCompleteStatus(user);
+    const bankStatement = getBankStatementStatus(statement);
+    const directDebitSetup =
+      ddMandate?.status === MandateStatus.ACTIVE ||
+      ddMandate?.status === MandateStatus.INPROGRESS;
+    const ACCESS_INCOME_RATIO = 0.4;
+    const MONTHS_PER_YEAR = 12;
+    const monthly = toNumber(user.monthlyIncome ?? 0);
+    const accessAmount = Number((ACCESS_INCOME_RATIO * MONTHS_PER_YEAR * monthly).toFixed(2));
+    return { revenueEntered, kycComplete, bankStatement, directDebitSetup, accessAmount };
+  }
+
+  /** Current individual mandate period summary for dashboard. */
+  private async getIndividualMandateInfo(userId: string): Promise<IndividualMandateInfo | null> {
+    await this.userMandateDao.expireForUser(userId);
+    const mandate = await this.userMandateDao.findCurrentForUser(userId);
+    if (!mandate) return null;
+    const usedAmount = await this.loanDao.sumDisbursedAmountByUserMandateId(mandate.id);
+    const totalAccessAmount = toNumber(mandate.totalAccessAmount);
+    const remainingAccess = Math.max(0, totalAccessAmount - usedAmount);
+    const startDate =
+      typeof mandate.startDate === "string"
+        ? (mandate.startDate as string).slice(0, 10)
+        : mandate.startDate instanceof Date
+          ? mandate.startDate.toISOString().slice(0, 10)
+          : String(mandate.startDate);
+    const endDate =
+      typeof mandate.endDate === "string"
+        ? (mandate.endDate as string).slice(0, 10)
+        : mandate.endDate instanceof Date
+          ? mandate.endDate.toISOString().slice(0, 10)
+          : String(mandate.endDate);
+    return {
+      id: mandate.id,
+      status: mandate.status as "ACTIVE" | "EXPIRED",
+      totalAccessAmount,
+      usedAmount: Number(usedAmount.toFixed(2)),
+      remainingAccess: Number(remainingAccess.toFixed(2)),
+      startDate,
+      endDate
+    };
   }
 
   private async getGroupPoolStatus(

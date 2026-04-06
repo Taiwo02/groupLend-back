@@ -1,11 +1,14 @@
 import { Transaction } from "sequelize";
-import { Account, Mandate } from "../models/index.js";
+import { Account, Mandate, UserMandate } from "../models/index.js";
 import { AccountStatus } from "../models/enums.js";
 
 export class AccountDao {
   create(
     payload: {
-      mandateId: string;
+      /** Set for group member accounts. */
+      mandateId?: string | null;
+      /** Set for individual user accounts. */
+      userMandateId?: string | null;
       memberMandateId?: string | null;
       reference?: string | null;
       monoCustomerId?: string | null;
@@ -21,6 +24,8 @@ export class AccountDao {
     return Account.create(
       {
         ...payload,
+        mandateId: payload.mandateId ?? null,
+        userMandateId: payload.userMandateId ?? null,
         mandateData: payload.mandateData ?? {},
         initiateMandateData: payload.initiateMandateData ?? {},
         isRequired: payload.isRequired ?? false,
@@ -34,9 +39,18 @@ export class AccountDao {
     return Account.findByPk(id, { transaction });
   }
 
+  /** Eager-load group Mandate. Use for group member accounts. */
   findByIdWithMandate(id: string, transaction?: Transaction): Promise<Account | null> {
     return Account.findByPk(id, {
-      include: [{ model: Mandate, as: "mandate", required: true }],
+      include: [{ model: Mandate, as: "mandate", required: false }],
+      transaction
+    });
+  }
+
+  /** Eager-load UserMandate. Use for individual user accounts. */
+  findByIdWithUserMandate(id: string, transaction?: Transaction): Promise<Account | null> {
+    return Account.findByPk(id, {
+      include: [{ model: UserMandate, as: "userMandate", required: false }],
       transaction
     });
   }
@@ -109,6 +123,28 @@ export class AccountDao {
     return Account.findAll({
       where: { memberMandateId },
       order: [["createdAt", "DESC"]],
+      transaction
+    });
+  }
+
+  /** Saved direct-debit accounts for an individual user mandate, newest first. */
+  findByUserMandateIdOrderByCreatedDesc(
+    userMandateId: string,
+    transaction?: Transaction
+  ): Promise<Account[]> {
+    return Account.findAll({
+      where: { userMandateId },
+      order: [["createdAt", "DESC"]],
+      transaction
+    });
+  }
+
+  findActiveByUserMandateId(
+    userMandateId: string,
+    transaction?: Transaction
+  ): Promise<Account[]> {
+    return Account.findAll({
+      where: { userMandateId, status: AccountStatus.ACTIVE },
       transaction
     });
   }

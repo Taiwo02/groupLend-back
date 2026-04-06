@@ -12,8 +12,10 @@ export class Loan extends Model<InferAttributes<Loan>, InferCreationAttributes<L
   declare id: CreationOptional<string>;
   declare borrowerId: string;
   declare groupId: string | null;
-  /** Group mandate (year) under which this loan was taken; required for group loans. */
+  /** Group mandate (year) under which this loan was taken; set for group loans. */
   declare mandateId: string | null;
+  /** Individual mandate (year) under which this loan was taken; set for individual loans. */
+  declare userMandateId: string | null;
   declare amount: number;
   declare interestRate: number;
   declare tenorMonths: number;
@@ -40,6 +42,10 @@ Loan.init(
       allowNull: true
     },
     mandateId: {
+      type: DataTypes.UUID,
+      allowNull: true
+    },
+    userMandateId: {
       type: DataTypes.UUID,
       allowNull: true
     },

@@ -109,14 +109,12 @@ export class GroupMemberDao {
   }
 
   /**
-   * Pending invited members.
-   *
-   * Primarily relies on `invitationToken` being non-null to detect pending invites even if
-   * the `status` column has drifted.
+   * Members who have been added to the group but not yet accepted (same basis as onboarding: {@link findMembersByGroupId} INVITED slice).
+   * Do not require `invitationToken`: legacy rows and some flows can be INVITED with a null token.
    */
   findPendingInvitedMembersByGroupId(groupId: string, transaction?: Transaction): Promise<GroupMember[]> {
     return GroupMember.findAll({
-      where: { groupId, invitationToken: { [Op.ne]: null } },
+      where: { groupId, status: GroupMemberStatus.INVITED },
       transaction
     });
   }

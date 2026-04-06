@@ -57,7 +57,7 @@
     },
     {
       "name": "Users · Loans",
-      "description": "Loan requests, get loan, member approve/reject (`/loans/...` except institutional callback)."
+      "description": "Loan requests, get loan, member approve/reject, individual activity feed, and individual direct-debit mandate setup (`/loans/...` except institutional callback)."
     },
     {
       "name": "Users · Repayments",
@@ -1430,7 +1430,8 @@
         "tags": [
           "Users · Dashboard"
         ],
-        "summary": "Get dashboard (requires onboarding complete)",
+        "summary": "Get dashboard",
+        "description": "Returns the full dashboard for the authenticated user. `userType` is `\"group\"` if the user is an active member of a group, or `\"individual\"` for standalone users. The `view` field is `\"onboarding\"` until the user (or all group members) complete KYC; then `\"full\"`. Fields marked as group-only are null for individuals; fields marked individual-only are null for group members.",
         "security": [
           {
             "bearerAuth": []
@@ -1442,94 +1443,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "activeLoans": {
-                      "type": "integer"
-                    },
-                    "pendingApprovals": {
-                      "type": "integer"
-                    },
-                    "creditEligibility": {
-                      "type": "number"
-                    },
-                    "groupPoolStatus": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "groupId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "groupName": {
-                            "type": "string"
-                          },
-                          "currentPool": {
-                            "type": "number"
-                          }
-                        }
-                      }
-                    },
-                    "credibilityScore": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "trustBadge": {
-                      "type": "string",
-                      "enum": [
-                        "BRONZE",
-                        "SILVER",
-                        "GOLD"
-                      ]
-                    },
-                    "deadline": {
-                      "type": "string",
-                      "format": "date-time",
-                      "nullable": true,
-                      "description": "Group deadline (e.g. quarterly end); null if not set"
-                    },
-                    "projectedAmount": {
-                      "type": "number",
-                      "description": "Projected amount (group target credit / goal)"
-                    },
-                    "nonAcceptedMemberships": {
-                      "type": "array",
-                      "description": "Members who have not yet accepted the group invite",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "userId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "fullName": {
-                            "type": "string"
-                          },
-                          "email": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "INVITED"
-                            ]
-                          },
-                          "invitedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "nullable": true
-                          }
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/DashboardData"
                 }
               }
             }
           },
-          "403": {
-            "description": "Onboarding not complete"
+          "404": {
+            "description": "User not found"
           }
         }
       }
@@ -2124,16 +2044,33 @@
     },
     "/admin/groups/{id}/activity": {
       "get": {
+        "operationId": "getGroupActivity",
         "tags": ["Admin · Users & groups"],
         "summary": "Recent group activity (admin)",
-        "description": "Merges paid repayments on group loans and recent loan requests, newest first.",
+        "description": "Merges six event types — repayments, loan requests, loan approvals, loan disbursements, member joins, and member exits — sorted newest-first and capped at `limit`. All event types share the same shape; `amount` and `loanId` are null for membership events.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
           { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
         ],
         "responses": {
-          "200": { "description": "OK" },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activity": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/GroupActivityItem" }
+                    },
+                    "limit": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
           "401": { "description": "Unauthorized" },
           "403": { "description": "Admin access denied" },
           "404": { "description": "Group not found" }
@@ -4419,7 +4356,7 @@
           "Users · Loans"
         ],
         "summary": "Request individual loan",
-        "description": "Create an individual (non-group) loan for the authenticated user. Amount must not exceed the user's credit limit. Requires onboarding complete and loan PIN in body.",
+        "description": "Create an individual (non-group) loan for the authenticated user. Amount must not exceed the user's credit limit AND the remaining access amount for the current individual mandate period (40% of annual income, rolling 12-month window). The mandate period is created automatically on first request. Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -4481,7 +4418,7 @@
             }
           },
           "400": {
-            "description": "Amount exceeds credit limit"
+            "description": "Amount exceeds credit limit or individual mandate access amount for the current period"
           },
           "403": {
             "description": "Onboarding not complete or invalid PIN"
@@ -4615,6 +4552,271 @@
           "404": {
             "description": "Group not found"
           }
+        }
+      }
+    },
+    "/loans/activity": {
+      "get": {
+        "operationId": "getMyActivity",
+        "tags": ["Users · Loans"],
+        "summary": "My activity feed (individual)",
+        "description": "Returns the authenticated user's own loan requests and paid repayments, merged and sorted newest-first. Intended for individual (non-group) users; group members should use the group activity endpoint. Capped at 50 items.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activity": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/UserActivityItem" }
+                    },
+                    "limit": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loans/direct-debit-mandate": {
+      "get": {
+        "operationId": "getIndividualDirectDebitMandate",
+        "tags": ["Users · Loans"],
+        "summary": "Get my individual direct-debit mandate",
+        "description": "Returns the current user's individual (non-group) direct-debit mandate, if any. Returns `{ mandate: null }` if none exists yet.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": {
+                      "oneOf": [
+                        { "type": "null" },
+                        { "$ref": "#/components/schemas/DirectDebitMandateResult" }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAndAuthorizeIndividualDirectDebitMandate",
+        "tags": ["Users · Loans"],
+        "summary": "Create individual mandate and send BVN OTP",
+        "description": "Creates an individual (non-group) direct-debit mandate if one does not already exist (or the existing one is no longer active), then initiates Mono BVN verification and sends OTP to the user's phone or email. Use the returned `mandate.id` with the confirm endpoint. Optional body: `{ \"resend\": true }` (throttled once per 3 hours).",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resend": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP sent; mandate returned for confirm step",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": { "$ref": "#/components/schemas/DirectDebitMandateResult" },
+                    "ok": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "sessionId": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already have an active mandate within 12 months, BVN/KYC missing, Mono BVN init or OTP failed, or resend throttled"
+          }
+        }
+      }
+    },
+    "/loans/direct-debit-mandate/accounts": {
+      "get": {
+        "operationId": "listIndividualDirectDebitAccounts",
+        "tags": ["Users · Loans"],
+        "summary": "List saved individual direct-debit accounts",
+        "description": "Returns the bank accounts linked for the current user under their active individual mandate period, ordered by createdAt descending. Empty array if no mandate exists or the mandate has not reached INPROGRESS/ACTIVE state yet.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accounts": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loans/direct-debit-mandate/{mandateId}/confirm": {
+      "post": {
+        "operationId": "confirmIndividualDirectDebitMandate",
+        "tags": ["Users · Loans"],
+        "summary": "Confirm individual mandate with OTP",
+        "description": "Verifies the BVN OTP, fetches BVN-linked bank accounts from Mono, creates a Mono payment mandate for each account, saves Account rows linked to the user's active individual UserMandate, and marks the DirectDebitMandate as INPROGRESS. Returns the updated mandate and created accounts.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "mandateId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["otp"],
+                "properties": {
+                  "otp": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mandate confirmed; accounts saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": { "$ref": "#/components/schemas/DirectDebitMandateResult" },
+                    "accounts": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid OTP, mandate not INACTIVE, no session ID, BVN/KYC missing, no accounts returned, or this is a group mandate"
+          },
+          "403": { "description": "Not your mandate" },
+          "404": { "description": "Mandate not found" }
+        }
+      }
+    },
+    "/loans/direct-debit-mandate/accounts/{accountId}": {
+      "post": {
+        "operationId": "getOrRefreshIndividualAccountMandate",
+        "tags": ["Users · Loans"],
+        "summary": "Get or refresh individual account Mono mandate",
+        "description": "Returns the linked bank account as-is if the Mono mandate reference is fresh (< 3 hours) or the account is already ACTIVE. Otherwise re-initiates a Mono payment mandate and persists the new reference. Use this to ensure the mandate reference is current before the bank authorises it.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account record (refreshed if needed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "account": { "$ref": "#/components/schemas/DebitLinkedAccount" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing bank details; complete confirmation first" },
+          "403": { "description": "Account not linked to your individual mandate" },
+          "404": { "description": "Account not found" }
+        }
+      }
+    },
+    "/loans/direct-debit-mandate/accounts/{accountId}/verify": {
+      "post": {
+        "operationId": "verifyIndividualAccountMandate",
+        "tags": ["Users · Loans"],
+        "summary": "Poll Mono to verify individual account mandate approval",
+        "description": "Calls the Mono payment mandate retrieval API to check whether the bank has approved the mandate. Marks the account ACTIVE if approved. Returns 400 with `data: null` if still pending.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandate approved; account marked ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "data": { "type": "object", "nullable": true, "additionalProperties": true }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Mandate still pending or no mandate reference" },
+          "403": { "description": "Account not linked to your individual mandate" },
+          "404": { "description": "Account not found" }
         }
       }
     },
@@ -5235,6 +5437,195 @@
           }
         }
       },
+      "DirectDebitMandateResult": {
+        "type": "object",
+        "description": "Serialised DirectDebitMandate returned by mandate endpoints.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid", "nullable": true, "description": "Null for individual mandates." },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "FAILED", "INPROGRESS", "COMPLETED", "CANCELED"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UserMandate": {
+        "type": "object",
+        "description": "Individual (non-group) yearly lending mandate period. Tracks the rolling 12-month access cap for a standalone user.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "year": { "type": "integer", "description": "Period-start encoded as YYYYMMDD integer (same convention as group Mandate)." },
+          "totalAccessAmount": { "type": "number", "description": "40% of user's annual income — the cap for this mandate period." },
+          "status": { "type": "string", "enum": ["ACTIVE", "EXPIRED"] },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "IndividualMandateInfo": {
+        "type": "object",
+        "description": "Summary of the active individual mandate period shown on the dashboard.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["ACTIVE", "EXPIRED"] },
+          "totalAccessAmount": { "type": "number" },
+          "usedAmount": { "type": "number" },
+          "remainingAccess": { "type": "number" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" }
+        }
+      },
+      "IndividualOnboarding": {
+        "type": "object",
+        "description": "Onboarding checklist for a standalone (non-group) user.",
+        "properties": {
+          "revenueEntered": { "type": "string", "enum": ["verified", "pending"] },
+          "kycComplete": { "type": "string", "enum": ["done", "processing", "pending"] },
+          "bankStatement": { "type": "string", "enum": ["uploaded", "awaiting"] },
+          "directDebitSetup": { "type": "boolean", "description": "True if the user's individual DirectDebitMandate is ACTIVE or INPROGRESS." },
+          "accessAmount": { "type": "number", "description": "Calculated individual access amount: 40% × 12 × monthlyIncome." }
+        }
+      },
+      "UserActivityItem": {
+        "type": "object",
+        "description": "Single item in the individual user activity feed.",
+        "properties": {
+          "type": { "type": "string", "enum": ["loan_requested", "repayment"] },
+          "at": { "type": "string", "format": "date-time" },
+          "summary": { "type": "string" },
+          "amount": { "type": "number", "nullable": true },
+          "loanId": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "GroupActivityItem": {
+        "type": "object",
+        "description": "Single item in the admin group activity feed.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["repayment", "loan_requested", "loan_approved", "loan_disbursed", "member_joined", "member_exited"]
+          },
+          "at": { "type": "string", "format": "date-time" },
+          "summary": { "type": "string" },
+          "amount": { "type": "number", "nullable": true, "description": "Null for membership events." },
+          "loanId": { "type": "string", "format": "uuid", "nullable": true, "description": "Null for membership events." }
+        }
+      },
+      "DashboardData": {
+        "type": "object",
+        "description": "Unified dashboard response for both group members and individual users.",
+        "properties": {
+          "view": {
+            "type": "string",
+            "enum": ["onboarding", "full"],
+            "description": "onboarding = KYC not yet complete; full = ready to transact."
+          },
+          "userType": {
+            "type": "string",
+            "enum": ["group", "individual"],
+            "description": "group = active member of a credit group; individual = standalone user."
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "fullName": { "type": "string" },
+              "memberIdDisplay": { "type": "string" },
+              "trustLevel": { "type": "string", "enum": ["BRONZE", "SILVER", "GOLD"] },
+              "currentBalance": { "type": "number" }
+            }
+          },
+          "groupHealthPercent": {
+            "type": "integer",
+            "description": "Group members: % of members with KYC+income+bank done. Individual: 100 if KYC approved, proportional otherwise."
+          },
+          "allKycComplete": { "type": "boolean" },
+          "groupOnboarding": {
+            "nullable": true,
+            "description": "Group member onboarding checklist. Null for individual users.",
+            "type": "object",
+            "properties": {
+              "groupId": { "type": "string", "format": "uuid" },
+              "groupName": { "type": "string" },
+              "onboardingPercent": { "type": "integer" },
+              "groupGoal": { "type": "number" },
+              "unlockedSoFar": { "type": "number" },
+              "membersReady": { "type": "integer" },
+              "membersTotal": { "type": "integer" },
+              "creditStatus": { "type": "string", "enum": ["locked", "unlocked"] },
+              "lockReason": { "type": "string" },
+              "members": { "type": "array", "items": { "type": "object" } }
+            }
+          },
+          "individualOnboarding": {
+            "nullable": true,
+            "description": "Individual user onboarding checklist. Null for group members.",
+            "allOf": [{ "$ref": "#/components/schemas/IndividualOnboarding" }]
+          },
+          "availableCreditPool": { "type": "number", "description": "Group pool (0 for individual users)." },
+          "creditPoolUtilizationPercent": { "type": "integer" },
+          "personalLimit": { "type": "number", "description": "User's individual credit limit (3× monthly income)." },
+          "projectedGroupLimit": { "type": "number", "description": "Group target credit (0 for individual users)." },
+          "trustBadge": { "type": "string", "description": "Display label for the user's trust level badge." },
+          "badgeProgress": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "current": { "type": "number" },
+              "target": { "type": "number" },
+              "nextMilestone": { "type": "string" }
+            }
+          },
+          "activeLoans": { "type": "integer" },
+          "pendingApprovalsCount": { "type": "integer" },
+          "pendingPeerApprovals": { "type": "array", "items": { "type": "object" } },
+          "recentActivity": { "type": "array", "items": { "type": "object" } },
+          "earnBonusPoints": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "invitePoints": { "type": "integer" }
+            }
+          },
+          "groupPoolStatus": {
+            "type": "array",
+            "description": "One entry per group the user is active in (empty for individual users).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "groupId": { "type": "string", "format": "uuid" },
+                "groupName": { "type": "string" },
+                "currentPool": { "type": "number" }
+              }
+            }
+          },
+          "credibilityScore": { "type": "number", "nullable": true, "description": "Highest credibility score across user's groups. Null for individual users." },
+          "creditEligibility": { "type": "number" },
+          "deadline": { "type": "string", "format": "date-time", "nullable": true, "description": "Group quarterly end date. Null for individual users." },
+          "projectedAmount": { "type": "number" },
+          "nonAcceptedMemberships": {
+            "type": "array",
+            "description": "Group invitees who have not yet accepted. Empty for individual users.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": { "type": "string", "format": "uuid" },
+                "fullName": { "type": "string" },
+                "email": { "type": "string" },
+                "status": { "type": "string", "enum": ["INVITED"] },
+                "invitedAt": { "type": "string", "format": "date-time", "nullable": true }
+              }
+            }
+          },
+          "individualMandate": {
+            "nullable": true,
+            "description": "Active individual mandate period info. Null for group members.",
+            "allOf": [{ "$ref": "#/components/schemas/IndividualMandateInfo" }]
+          }
+        }
+      },
       "GroupLoan": {
         "allOf": [
           {
@@ -5279,7 +5670,14 @@
           "mandateId": {
             "type": "string",
             "format": "uuid",
-            "nullable": true
+            "nullable": true,
+            "description": "Group mandate FK — set for group loans."
+          },
+          "userMandateId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Individual mandate FK — set for individual (non-group) loans."
           },
           "amount": {
             "type": "number"

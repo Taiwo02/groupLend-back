@@ -105,7 +105,7 @@ export type AdminGroupMemberRow = {
 };
 
 export type AdminGroupActivityItem = {
-  type: "repayment" | "loan_requested";
+  type: "repayment" | "loan_requested" | "loan_approved" | "loan_disbursed" | "member_joined" | "member_exited";
   at: string;
   summary: string;
   amount: number | null;
@@ -627,14 +627,15 @@ export class AdminGroupsService {
       };
     });
 
+    type LWithB = Loan & { borrower?: { fullName: string } };
+
     const recentLoans = await Loan.findAll({
       where: { groupId },
       order: [["createdAt", "DESC"]],
-      limit: Math.min(5, limit),
+      limit: Math.min(10, limit),
       include: [{ model: User, as: "borrower", attributes: ["fullName"] }]
     });
 
-    type LWithB = Loan & { borrower?: { fullName: string } };
     const fromLoans: AdminGroupActivityItem[] = recentLoans.map((l) => {
       const lw = l as LWithB;
       const name = lw.borrower?.fullName ?? "Member";
@@ -647,9 +648,92 @@ export class AdminGroupsService {
       };
     });
 
-    const merged = [...fromRepayments, ...fromLoans].sort(
-      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
-    );
+    const approvedLoans = await Loan.findAll({
+      where: { groupId, status: { [Op.in]: [LoanStatus.APPROVED, LoanStatus.REVIEWING, LoanStatus.PROCESSING] } },
+      order: [["updatedAt", "DESC"]],
+      limit: Math.min(5, limit),
+      include: [{ model: User, as: "borrower", attributes: ["fullName"] }]
+    });
+
+    const fromApproved: AdminGroupActivityItem[] = approvedLoans.map((l) => {
+      const lw = l as LWithB;
+      const name = lw.borrower?.fullName ?? "Member";
+      return {
+        type: "loan_approved" as const,
+        at: l.updatedAt.toISOString(),
+        summary: `${name} loan approved`,
+        amount: toNumber(l.amount),
+        loanId: l.id
+      };
+    });
+
+    const disbursedLoans = await Loan.findAll({
+      where: { groupId, status: { [Op.in]: [LoanStatus.DISBURSED, LoanStatus.ACTIVE] } },
+      order: [["updatedAt", "DESC"]],
+      limit: Math.min(5, limit),
+      include: [{ model: User, as: "borrower", attributes: ["fullName"] }]
+    });
+
+    const fromDisbursed: AdminGroupActivityItem[] = disbursedLoans.map((l) => {
+      const lw = l as LWithB;
+      const name = lw.borrower?.fullName ?? "Member";
+      return {
+        type: "loan_disbursed" as const,
+        at: l.updatedAt.toISOString(),
+        summary: `${name} loan disbursed`,
+        amount: toNumber(l.amount),
+        loanId: l.id
+      };
+    });
+
+    type GMWithUser = GroupMember & { user?: { fullName: string } };
+
+    const joinedMembers = await GroupMember.findAll({
+      where: { groupId, status: GroupMemberStatus.ACTIVE },
+      order: [["createdAt", "DESC"]],
+      limit: Math.min(5, limit),
+      include: [{ model: User, as: "user", attributes: ["fullName"] }]
+    });
+
+    const fromJoined: AdminGroupActivityItem[] = joinedMembers.map((m) => {
+      const mw = m as GMWithUser;
+      const name = mw.user?.fullName ?? "Member";
+      return {
+        type: "member_joined" as const,
+        at: m.createdAt.toISOString(),
+        summary: `${name} joined the group`,
+        amount: null,
+        loanId: null
+      };
+    });
+
+    const exitedMembers = await GroupMember.findAll({
+      where: { groupId, status: GroupMemberStatus.EXITED },
+      order: [["updatedAt", "DESC"]],
+      limit: Math.min(5, limit),
+      include: [{ model: User, as: "user", attributes: ["fullName"] }]
+    });
+
+    const fromExited: AdminGroupActivityItem[] = exitedMembers.map((m) => {
+      const mw = m as GMWithUser;
+      const name = mw.user?.fullName ?? "Member";
+      return {
+        type: "member_exited" as const,
+        at: m.updatedAt.toISOString(),
+        summary: `${name} exited the group`,
+        amount: null,
+        loanId: null
+      };
+    });
+
+    const merged = [
+      ...fromRepayments,
+      ...fromLoans,
+      ...fromApproved,
+      ...fromDisbursed,
+      ...fromJoined,
+      ...fromExited
+    ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     return merged.slice(0, limit);
   }
 

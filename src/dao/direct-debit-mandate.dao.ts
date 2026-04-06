@@ -4,11 +4,11 @@ import { MandateStatus } from "../models/enums.js";
 
 export class DirectDebitMandateDao {
   create(
-    payload: { userId: string; groupId: string; status?: MandateStatus },
+    payload: { userId: string; groupId?: string | null; status?: MandateStatus },
     transaction?: Transaction
   ): Promise<DirectDebitMandate> {
     return DirectDebitMandate.create(
-      { ...payload, status: payload.status ?? MandateStatus.INACTIVE },
+      { ...payload, groupId: payload.groupId ?? null, status: payload.status ?? MandateStatus.INACTIVE },
       { transaction: transaction ?? undefined }
     );
   }
@@ -25,6 +25,15 @@ export class DirectDebitMandateDao {
   ): Promise<DirectDebitMandate | null> {
     return DirectDebitMandate.findOne({
       where: { userId, groupId },
+      order: [["createdAt", "DESC"]],
+      transaction
+    });
+  }
+
+  /** Latest individual (no-group) direct-debit mandate for a user. */
+  findByUserOnly(userId: string, transaction?: Transaction): Promise<DirectDebitMandate | null> {
+    return DirectDebitMandate.findOne({
+      where: { userId, groupId: null },
       order: [["createdAt", "DESC"]],
       transaction
     });

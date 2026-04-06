@@ -14,6 +14,7 @@ import { User } from "./user.model.js";
 import { UserKycData } from "./user-kyc-data.model.js";
 import { UserKycOtp } from "./user-kyc-otp.model.js";
 import { KycVerification } from "./kyc-verification.model.js";
+import { UserMandate } from "./user-mandate.model.js";
 
 export const initModelAssociations = (): void => {
   User.hasMany(UserKycData, { foreignKey: "userId", as: "kycDataRecords" });
@@ -56,6 +57,14 @@ export const initModelAssociations = (): void => {
   Loan.belongsTo(Mandate, { foreignKey: "mandateId", as: "mandate" });
   Mandate.hasMany(Loan, { foreignKey: "mandateId", as: "loans" });
 
+  // Individual mandate associations
+  User.hasMany(UserMandate, { foreignKey: "userId", as: "userMandates" });
+  UserMandate.belongsTo(User, { foreignKey: "userId", as: "user" });
+  UserMandate.hasMany(Loan, { foreignKey: "userMandateId", as: "loans" });
+  Loan.belongsTo(UserMandate, { foreignKey: "userMandateId", as: "userMandate" });
+  UserMandate.hasMany(Account, { foreignKey: "userMandateId", as: "accounts" });
+  Account.belongsTo(UserMandate, { foreignKey: "userMandateId", as: "userMandate" });
+
   Loan.hasMany(LoanApproval, { foreignKey: "loanId", as: "approvals" });
   LoanApproval.belongsTo(Loan, { foreignKey: "loanId", as: "loan" });
   LoanApproval.belongsTo(User, { foreignKey: "approverId", as: "approver" });
@@ -86,5 +95,6 @@ export {
   MemberMandate,
   Repayment,
   DirectDebitMandate,
-  Notification
+  Notification,
+  UserMandate
 };

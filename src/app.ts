@@ -55,7 +55,11 @@ export function createApp(): Hono {
   app.route("/groups", createGroupRoutes(container.groupController, container.directDebitMandateController));
   app.route(
     "/loans",
-    createLoanRoutes(container.loanController, container.requireOnboardingComplete)
+    createLoanRoutes(
+      container.loanController,
+      container.requireOnboardingComplete,
+      container.directDebitMandateController
+    )
   );
   app.route("/repayments", createRepaymentRoutes(container.repaymentController));
 
