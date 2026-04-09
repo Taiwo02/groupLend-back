@@ -1,4 +1,7 @@
+import { Transaction } from "sequelize";
+import { sequelize } from "../config/database.js";
 import { KycStatus } from "../models/enums.js";
+import { User } from "../models/index.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
@@ -178,33 +181,75 @@ export class KycService {
       });
       await this.statementSyncService.saveStatementInfo(userId, payload.code);
     } else if (payload.step === 2) {
-      await this.userKycDataDao.upsert(userId, { employmentDetails: payload.employmentDetails });
-      const mi = payload.employmentDetails.monthlyIncome;
-      const creditLimit = this.creditService.calculateIndividualCreditLimit(mi);
-      await this.userDao.updateProfile(userId, {
-        monthlyIncome: mi,
-        employmentStatus: payload.employmentDetails.employmentStatus
+      await sequelize.transaction(async (transaction) => {
+        const u = await User.findByPk(userId, {
+          transaction,
+          lock: Transaction.LOCK.UPDATE
+        });
+        if (!u) throw new HttpError(401, "User not found");
+
+        if (u.kycStatus === KycStatus.APPROVED) {
+          result = { message: "KYC is already approved", kycStep: u.kycStep };
+          return;
+        }
+        if (u.kycStatus === KycStatus.REJECTED) {
+          throw new HttpError(400, "KYC was rejected; please contact support");
+        }
+        if (u.kycStep >= KYC_MAX_STEP) {
+          result = { message: "KYC already submitted and under review", kycStep: u.kycStep };
+          return;
+        }
+        if (payload.step !== u.kycStep) {
+          throw new HttpError(400, `Expected step ${u.kycStep}, got ${payload.step}`);
+        }
+
+        const lockedNextStep = u.kycStep + 1;
+        await this.userKycDataDao.upsert(userId, { employmentDetails: payload.employmentDetails }, transaction);
+        const mi = payload.employmentDetails.monthlyIncome;
+        const creditLimit = this.creditService.calculateIndividualCreditLimit(mi);
+        await this.userDao.updateProfile(
+          userId,
+          {
+            monthlyIncome: mi,
+            employmentStatus: payload.employmentDetails.employmentStatus
+          },
+          transaction
+        );
+        await this.userDao.updateCreditLimit(userId, creditLimit, transaction);
+        await this.creditService.recalculatePoolsForUserGroups(userId, transaction);
+        await this.userDao.updateKycStatus(userId, KycStatus.SUBMITTED, transaction);
+        await this.userDao.updateKycStep(userId, lockedNextStep, transaction);
+
+        const draft = await this.userKycDataDao.findDraftByUserId(userId, transaction);
+        if (!draft) throw new HttpError(400, "No draft KYC data to submit");
+        const submitted = await this.userKycDataDao.createSubmitted(
+          userId,
+          {
+            bioData: draft.bioData,
+            contact: draft.contact,
+            employmentDetails: draft.employmentDetails,
+            profilePicture: draft.profilePicture,
+            ninData: draft.ninData,
+            bvnEncrypted: draft.bvnEncrypted,
+            ninLookupKey: draft.ninLookupKey
+          },
+          transaction
+        );
+        await this.kycVerificationDao.upsertByKycDataId(
+          submitted.id,
+          userId,
+          { overallStatus: "PENDING" },
+          transaction
+        );
+        await draft.destroy({ transaction });
+        result = {
+          message: "KYC submitted successfully; we will get back to you soon",
+          kycStep: lockedNextStep
+        };
       });
-      await this.userDao.updateCreditLimit(userId, creditLimit);
-      await this.creditService.recalculatePoolsForUserGroups(userId);
-      await this.userDao.updateKycStatus(userId, KycStatus.SUBMITTED);
+      return result;
     }
     await this.userDao.updateKycStep(userId, nextStep);
-    if (nextStep === KYC_MAX_STEP) {
-      const draft = await this.userKycDataDao.findDraftByUserId(userId);
-      if (!draft) throw new HttpError(400, "No draft KYC data to submit");
-      const submitted = await this.userKycDataDao.createSubmitted(userId, {
-        bioData: draft.bioData,
-        contact: draft.contact,
-        employmentDetails: draft.employmentDetails,
-        profilePicture: draft.profilePicture,
-        ninData: draft.ninData,
-        bvnEncrypted: draft.bvnEncrypted,
-        ninLookupKey: draft.ninLookupKey
-      });
-      await this.kycVerificationDao.upsertByKycDataId(submitted.id, userId, { overallStatus: "PENDING" });
-      result.message = "KYC submitted successfully; we will get back to you soon";
-    }
     return result;
   }
 

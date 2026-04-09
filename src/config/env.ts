@@ -9,12 +9,22 @@ const parseBoolean = (value: string | undefined, fallback: boolean): boolean => 
   return value.toLowerCase() === "true";
 };
 
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.floor(n);
+};
+
 export const env = {
   port: Number(process.env.PORT ?? 3000),
   databaseUrl: process.env.DATABASE_URL ?? "",
   jwtSecret: process.env.JWT_SECRET ?? "",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   dbLogging: parseBoolean(process.env.DB_LOGGING, false),
+  /** How many times to try `sequelize.authenticate()` before exiting (default 30). */
+  dbConnectMaxAttempts: parsePositiveInt(process.env.DB_CONNECT_MAX_ATTEMPTS, 30),
+  /** Milliseconds between database connection attempts (default 2000). */
+  dbConnectRetryMs: parsePositiveInt(process.env.DB_CONNECT_RETRY_MS, 2000),
   monoApiUrl: process.env.MONO_API_URL ?? "",
   monoId: process.env.MONO_ID ?? "",
   monoLookUpdId: process.env.MONO_ID_LOOKUP ?? "",

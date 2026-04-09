@@ -1,5 +1,4 @@
-import { Op } from "sequelize";
-import { Transaction } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import { Group, GroupMember, User } from "../models/index.js";
 import { CreditStatus, KycStatus, TrustLevel } from "../models/enums.js";
 
@@ -152,27 +151,28 @@ export class UserDao {
       monthlyIncome?: number | null;
       employmentStatus?: string | null;
       location?: string | null;
-    }
+    },
+    transaction?: Transaction
   ): Promise<User | null> {
-    const user = await User.findByPk(userId);
+    const user = await User.findByPk(userId, { transaction });
     if (!user) return null;
-    await user.update(data);
+    await user.update(data, { transaction });
     return user;
   }
 
-  async updateCreditLimit(userId: string, creditLimit: number): Promise<void> {
-    await User.update({ creditLimit }, { where: { id: userId } });
+  async updateCreditLimit(userId: string, creditLimit: number, transaction?: Transaction): Promise<void> {
+    await User.update({ creditLimit }, { where: { id: userId }, transaction });
   }
 
-  async updateKycStep(userId: string, kycStep: number): Promise<User | null> {
-    const user = await User.findByPk(userId);
+  async updateKycStep(userId: string, kycStep: number, transaction?: Transaction): Promise<User | null> {
+    const user = await User.findByPk(userId, { transaction });
     if (!user) return null;
-    await user.update({ kycStep });
+    await user.update({ kycStep }, { transaction });
     return user;
   }
 
-  async updateKycStatus(userId: string, kycStatus: KycStatus): Promise<void> {
-    await User.update({ kycStatus }, { where: { id: userId } });
+  async updateKycStatus(userId: string, kycStatus: KycStatus, transaction?: Transaction): Promise<void> {
+    await User.update({ kycStatus }, { where: { id: userId }, transaction });
   }
 
   async updateFullName(userId: string, fullName: string): Promise<User | null> {
