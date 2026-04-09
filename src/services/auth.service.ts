@@ -8,6 +8,7 @@ import { Group, GroupMember, User } from "../models/index.js";
 import { CreditStatus, KycStatus } from "../models/enums.js";
 import { GroupMemberRole, GroupMemberStatus } from "../models/enums.js";
 import { compareHash, hashValue, signJwt } from "../utils/auth.js";
+import { effectiveGroupMemberRole } from "../utils/effective-group-member-role.js";
 import { HttpError } from "../utils/http-error.js";
 import { env } from "../config/env.js";
 import { EmailService } from "../email/email.service.js";
@@ -32,6 +33,13 @@ export type LoginInput = {
 
 export type SubmitIncomeInput = {
   monthlyIncome: number;
+  employmentStatus?: string | null;
+};
+
+export type UpdateProfileInput = {
+  fullName?: string;
+  phone?: string | null;
+  location?: string | null;
   employmentStatus?: string | null;
 };
 
@@ -85,6 +93,14 @@ export class AuthService {
         role: GroupMemberRole.MEMBER,
         status: GroupMemberStatus.ACTIVE
       });
+      const group = await this.groupDao.findById(acceptedInvite.groupId);
+      if (group?.createdBy === user.id) {
+        await this.groupMemberDao.updateMemberRole(
+          acceptedInvite.groupId,
+          user.id,
+          GroupMemberRole.CREATOR
+        );
+      }
       await this.groupInviteDao.markAccepted(acceptedInvite.id);
       await this.groupInviteDao.markExpiredForEmail(normalizedEmail, acceptedInvite.id);
       await this.creditService.recalculatePoolsForUserGroups(user.id);
@@ -141,6 +157,21 @@ export class AuthService {
     return user.monthlyIncome == null ? "INCOME_PENDING" : "ONBOARDING_COMPLETE";
   }
 
+  /** Update display name, phone, location, and/or employment status. Income and credit limit remain via submitIncome. */
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<User> {
+    const user = await this.userDao.findById(userId);
+    if (!user) throw new HttpError(404, "User not found");
+
+    await this.userDao.updateProfile(userId, {
+      ...(input.fullName !== undefined ? { fullName: input.fullName.trim() } : {}),
+      ...(input.phone !== undefined ? { phone: input.phone } : {}),
+      ...(input.location !== undefined ? { location: input.location } : {}),
+      ...(input.employmentStatus !== undefined ? { employmentStatus: input.employmentStatus } : {})
+    });
+
+    return this.getProfile(userId);
+  }
+
   /** Get current user profile (requires auth). */
   async getProfile(userId: string): Promise<User> {
     const user = await this.userDao.findById(userId);
@@ -157,6 +188,11 @@ export class AuthService {
     for (const m of memberships) {
       const grp = m.group;
       if (!grp?.id) continue;
+      const role = effectiveGroupMemberRole(grp.createdBy, m.userId, m.role);
+      (m as unknown as { setDataValue: (k: string, v: GroupMemberRole) => void }).setDataValue(
+        "role",
+        role
+      );
       (grp as unknown as { setDataValue: (k: string, v: boolean) => void }).setDataValue(
         "runningMandate",
         runningGroupIds.has(grp.id)

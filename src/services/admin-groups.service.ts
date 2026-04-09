@@ -15,6 +15,7 @@ import {
   RepaymentStatus
 } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
+import { effectiveGroupMemberRole } from "../utils/effective-group-member-role.js";
 import { toNumber } from "../utils/number.js";
 import type { GroupService, CreateGroupInput } from "./group.service.js";
 
@@ -574,13 +575,14 @@ export class AdminGroupsService {
       const st = stmtByUser.get(u.id);
       const bankOk = st?.status === true;
 
+      const effRole = effectiveGroupMemberRole(g.createdBy, u.id, m.role);
       return {
         memberId: m.id,
         userId: u.id,
         fullName: u.fullName,
         email: u.email,
-        role: m.role,
-        roleLabel: roleLabel(m.role),
+        role: effRole,
+        roleLabel: roleLabel(effRole),
         memberStatus: m.status,
         kycUiStatus: memberKycUi(kyc),
         bankStatementStatus: bankOk ? "UPLOADED" : "NOT_STARTED",

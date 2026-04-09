@@ -272,6 +272,76 @@
             "description": "User not found"
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Users · Auth"
+        ],
+        "summary": "Update current user profile",
+        "description": "Partial update of `fullName`, `phone`, `location`, and/or `employmentStatus`. Send at least one field. Empty strings clear nullable fields. To change monthly income and individual credit limit, use `POST /auth/income`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "minProperties": 1,
+                "properties": {
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 25,
+                    "description": "Use empty string to clear"
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "Use empty string to clear"
+                  },
+                  "employmentStatus": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "Use empty string to clear"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or no fields to update"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
       }
     },
     "/auth/forget-password": {

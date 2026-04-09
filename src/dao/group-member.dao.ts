@@ -75,6 +75,15 @@ export class GroupMemberDao {
     await GroupMember.update({ status }, { where: { groupId, userId }, transaction });
   }
 
+  async updateMemberRole(
+    groupId: string,
+    userId: string,
+    role: GroupMemberRole,
+    transaction?: Transaction
+  ): Promise<void> {
+    await GroupMember.update({ role }, { where: { groupId, userId }, transaction });
+  }
+
   async deleteByGroupAndUser(groupId: string, userId: string, transaction?: Transaction): Promise<number> {
     const result = await GroupMember.destroy({ where: { groupId, userId }, transaction });
     return result;

@@ -8,6 +8,7 @@ import {
   setPasswordSchema,
   signupSchema,
   submitIncomeSchema,
+  updateProfileSchema,
   verifyEmailSchema
 } from "../validators/auth.validator.js";
 import { parseWithSchema, readJsonBody, z } from "../utils/request.js";
@@ -80,6 +81,13 @@ export class AuthController {
 
   async getProfile(c: Context): Promise<Response> {
     const user = await this.authService.getProfile(c.get("userId"));
+    return c.json({ user: sanitizeUser(user) });
+  }
+
+  async updateProfile(c: Context): Promise<Response> {
+    const body = await readJsonBody<Record<string, unknown>>(c);
+    const payload = parseWithSchema(updateProfileSchema, body);
+    const user = await this.authService.updateProfile(c.get("userId"), payload);
     return c.json({ user: sanitizeUser(user) });
   }
 

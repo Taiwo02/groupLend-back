@@ -146,6 +146,10 @@ export class InvitationService {
         },
         transaction
       );
+      const groupRow = await this.groupDao.findById(groupId, transaction);
+      if (groupRow?.createdBy === user.id) {
+        await this.groupMemberDao.updateMemberRole(groupId, user.id, GroupMemberRole.CREATOR, transaction);
+      }
       await this.groupInviteDao.markAccepted(inviteId, transaction);
       await this.groupInviteDao.markExpiredForEmail(normalizedEmail, inviteId, transaction);
       const pool = await this.creditService.calculateGroupCreditLimit(groupId, transaction);

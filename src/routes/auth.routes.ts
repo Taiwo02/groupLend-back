@@ -12,6 +12,7 @@ export function createAuthRoutes(
   routes.post("/login", (c) => authController.login(c));
   routes.post("/verify-email", (c) => authController.verifyEmail(c));
   routes.get("/profile", requireAuth, (c) => authController.getProfile(c));
+  routes.patch("/profile", requireAuth, (c) => authController.updateProfile(c));
   routes.post("/forget-password", (c) => authController.forgetPassword(c));
   routes.post("/set-password", (c) => authController.setPassword(c));
   routes.post("/change-password", requireAuth, (c) => authController.changePassword(c));

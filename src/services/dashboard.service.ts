@@ -8,9 +8,16 @@ import { RepaymentDao } from "../dao/repayment.dao.js";
 import { NotificationDao } from "../dao/notification.dao.js";
 import { UserMandateDao } from "../dao/user-mandate.dao.js";
 import { DirectDebitMandateDao } from "../dao/direct-debit-mandate.dao.js";
-import { ApprovalDecision, KycStatus, LoanStatus, MandateStatus } from "../models/enums.js";
+import {
+  ApprovalDecision,
+  GroupMemberRole,
+  KycStatus,
+  LoanStatus,
+  MandateStatus
+} from "../models/enums.js";
 import { toNumber } from "../utils/number.js";
 import { HttpError } from "../utils/http-error.js";
+import { effectiveGroupMemberRole } from "../utils/effective-group-member-role.js";
 import type { User } from "../models/index.js";
 import type { Statement } from "../models/index.js";
 
@@ -369,10 +376,11 @@ export class DashboardService {
       const contribution = u && u.monthlyIncome != null ? toNumber(u.monthlyIncome) * CONTRIBUTION_MULTIPLIER : 0;
       const isYou = m.userId === currentUserId;
       const action = getMemberAction(isYou, revenue, kyc, bank);
+      const role = effectiveGroupMemberRole(group.createdBy, m.userId, m.role as GroupMemberRole);
       return {
         userId: m.userId,
         fullName: u?.fullName ?? "Unknown",
-        role: m.role as "CREATOR" | "MEMBER",
+        role: role as "CREATOR" | "MEMBER",
         isYou,
         revenueEntered: revenue,
         kycComplete: kyc,

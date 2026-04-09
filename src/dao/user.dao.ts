@@ -5,7 +5,10 @@ import { CreditStatus, KycStatus, TrustLevel } from "../models/enums.js";
 
 export class UserDao {
   findByEmail(email: string): Promise<User | null> {
-    return User.findOne({ where: { email }, include: [{ model: GroupMember, as: "groups" }] });
+    return User.findOne({
+      where: { email },
+      include: [{ model: GroupMember, as: "groups", include: [{ model: Group, as: "group" }] }]
+    });
   }
 
   findById(id: string, transaction?: Transaction): Promise<User | null> {
@@ -144,6 +147,8 @@ export class UserDao {
   async updateProfile(
     userId: string,
     data: {
+      fullName?: string;
+      phone?: string | null;
       monthlyIncome?: number | null;
       employmentStatus?: string | null;
       location?: string | null;

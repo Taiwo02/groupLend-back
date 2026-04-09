@@ -42,6 +42,34 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, "New password must be at least 8 characters")
 });
 
+/** Partial profile update (display/contact/employment). Use POST /auth/income to change monthly income and credit limit. */
+export const updateProfileSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "fullName must be at least 2 characters").optional(),
+    phone: z.union([z.string().trim().max(25), z.literal("")]).optional(),
+    location: z.union([z.string().trim().max(120), z.literal("")]).optional(),
+    employmentStatus: z.union([z.string().trim().max(80), z.literal("")]).optional()
+  })
+  .transform((data) => ({
+    ...data,
+    phone: data.phone === undefined ? undefined : data.phone === "" ? null : data.phone,
+    location: data.location === undefined ? undefined : data.location === "" ? null : data.location,
+    employmentStatus:
+      data.employmentStatus === undefined
+        ? undefined
+        : data.employmentStatus === ""
+          ? null
+          : data.employmentStatus
+  }))
+  .refine(
+    (data) =>
+      data.fullName !== undefined ||
+      data.phone !== undefined ||
+      data.location !== undefined ||
+      data.employmentStatus !== undefined,
+    { message: "At least one field is required" }
+  );
+
 export const acceptInvitationSchema = z.object({
   signup: signupSchema.optional()
 });
