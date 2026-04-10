@@ -153,6 +153,15 @@ function memberIdDisplay(userId: string): string {
   return `#${hash.slice(0, 4)}-${hash.slice(4)}`;
 }
 
+/** Avoids RangeError from `Invalid Date`.toISOString() on bad DB DATEONLY values. */
+function toIso8601OrNull(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const d = value instanceof Date ? value : new Date(value as string | number);
+  const t = d.getTime();
+  if (Number.isNaN(t)) return null;
+  return d.toISOString();
+}
+
 function getRevenueStatus(user: User): RevenueStatus {
   return user.monthlyIncome != null && Number(user.monthlyIncome) > 0 ? "verified" : "pending";
 }
@@ -229,9 +238,7 @@ export class DashboardService {
     const firstGroup = isGroupMember ? await this.groupDao.findById(groupIds[0]) : null;
     const availableCreditPool = firstGroup ? toNumber(firstGroup.currentCreditPool) : 0;
     const projectedGroupLimit = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
-    const deadline = firstGroup?.quarterlyEndDate
-      ? new Date(firstGroup.quarterlyEndDate).toISOString()
-      : null;
+    const deadline = firstGroup ? toIso8601OrNull(firstGroup.quarterlyEndDate) : null;
     const projectedAmount = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
     const creditPoolUtilizationPercent =
       projectedGroupLimit > 0 ? Math.round((availableCreditPool / projectedGroupLimit) * 100) : 0;
@@ -448,7 +455,7 @@ export class DashboardService {
     return notifications.map((n) => ({
       type: n.type,
       message: n.message,
-      timestamp: n.createdAt.toISOString(),
+      timestamp: (n.createdAt ?? new Date(0)).toISOString(),
       category: n.type.includes("LOAN") ? "financial" : n.type.includes("GROUP") ? "member" : "system"
     }));
   }

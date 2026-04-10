@@ -8,13 +8,13 @@ import { GroupMemberRole } from "../models/enums.js";
 export function effectiveGroupMemberRole(
   groupCreatedBy: string,
   memberUserId: string,
-  storedRole: GroupMemberRole
+  storedRole: GroupMemberRole | null | undefined
 ): GroupMemberRole {
-  if (memberUserId === groupCreatedBy) {
+  if (groupCreatedBy && memberUserId === groupCreatedBy) {
     return GroupMemberRole.CREATOR;
   }
   if (storedRole === GroupMemberRole.CREATOR) {
     return GroupMemberRole.MEMBER;
   }
-  return storedRole;
+  return storedRole ?? GroupMemberRole.MEMBER;
 }
