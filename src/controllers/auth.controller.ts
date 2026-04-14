@@ -73,9 +73,15 @@ export class AuthController {
     const body = await readJsonBody<Record<string, unknown>>(c);
     const payload = parseWithSchema(verifyEmailSchema, body);
     const result = await this.authService.verifyEmail(payload.token);
+    if (!result.success) {
+      return c.json({ success: false, message: result.message });
+    }
     return c.json({
-      message: "Email verified successfully. You can now sign in.",
-      user: sanitizeUser(result.user)
+      success: true,
+      token: result.token,
+      user: sanitizeUser(result.user),
+      onboardingState: result.onboardingState,
+      message: "Email verified successfully."
     });
   }
 

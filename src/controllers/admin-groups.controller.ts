@@ -1,6 +1,6 @@
 import { Context } from "hono";
 import { AdminGroupsService } from "../services/admin-groups.service.js";
-import { GroupStatus } from "../models/enums.js";
+import { CredibilityLevel, GroupStatus } from "../models/enums.js";
 import {
   adminCreateGroupBodySchema,
   adminGroupActivityQuerySchema,
@@ -114,6 +114,7 @@ export class AdminGroupsController {
     const updated = await this.adminGroupsService.patchGroup(id, {
       ...patch,
       status: patch.status as GroupStatus | undefined,
+      credibilityLevel: patch.credibilityLevel as CredibilityLevel | undefined,
       currentCreditPool: patch.currentCreditPool,
       creditFrozen: patch.creditFrozen
     });

@@ -97,6 +97,8 @@ export class UserKycDataDao {
       bioData?: BioDataPayload | null;
       contact?: ContactPayload | null;
       employmentDetails?: EmploymentDetailsPayload | null;
+      meter?: string | null;
+      meterType?: string | null;
       profilePicture?: string | null;
       ninData?: Record<string, unknown> | null;
       bvnEncrypted?: string | null;
@@ -110,6 +112,8 @@ export class UserKycDataDao {
       bioData: data.bioData ?? existing?.bioData ?? null,
       contact: data.contact ?? existing?.contact ?? null,
       employmentDetails: data.employmentDetails ?? existing?.employmentDetails ?? null,
+      meter: data.meter !== undefined ? data.meter : existing?.meter ?? null,
+      meterType: data.meterType !== undefined ? data.meterType : existing?.meterType ?? null,
       profilePicture: data.profilePicture !== undefined ? data.profilePicture : existing?.profilePicture ?? null,
       ninData: data.ninData !== undefined ? data.ninData : existing?.ninData ?? null,
       bvnEncrypted: data.bvnEncrypted !== undefined ? data.bvnEncrypted : existing?.bvnEncrypted ?? null,
@@ -133,6 +137,8 @@ export class UserKycDataDao {
       bioData?: BioDataPayload | null;
       contact?: ContactPayload | null;
       employmentDetails?: EmploymentDetailsPayload | null;
+      meter?: string | null;
+      meterType?: string | null;
       profilePicture?: string | null;
       ninData?: Record<string, unknown> | null;
       bvnEncrypted?: string | null;

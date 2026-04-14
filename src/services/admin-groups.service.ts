@@ -757,8 +757,18 @@ export class AdminGroupsService {
       name?: string;
       description?: string;
       status?: GroupStatus;
+      credibilityScore?: number;
+      credibilityLevel?: CredibilityLevel;
       maximumAmount?: number | null;
       minimumAmount?: number | null;
+      repaymentPeriod?: number | null;
+      repaymentType?: "daily" | "weekly" | "monthly" | "quarterly" | "yearly" | null;
+      interestType?: "flat" | "reducingBalance" | null;
+      interest?: number | null;
+      penalCharges?: number | null;
+      gracePeriod?: number | null;
+      gracePeriodType?: "daily" | "weekly" | "monthly" | "quarterly" | "yearly" | null;
+      overGracePenalCharges?: number | null;
       targetCredit?: number;
       currentCreditPool?: number;
       creditFrozen?: boolean;

@@ -43,6 +43,10 @@ export type UpdateProfileInput = {
   employmentStatus?: string | null;
 };
 
+export type VerifyEmailResult =
+  | { success: true; token: string; user: User; onboardingState: OnboardingState }
+  | { success: false; message: string };
+
 export class AuthService {
   constructor(
     private readonly userDao: UserDao,
@@ -122,14 +126,31 @@ export class AuthService {
     };
   }
 
-  /** Verify email using the token sent in the welcome email. Allows user to sign in after. */
-  async verifyEmail(token: string): Promise<{ user: User }> {
-    const user = await this.userDao.findByEmailVerificationToken(token);
+  /**
+   * Verify email using the token sent in the welcome email.
+   * On first success, returns the same JWT and payload shape as login.
+   * If the email was already verified (e.g. link opened again), returns success: false.
+   */
+  async verifyEmail(verificationToken: string): Promise<VerifyEmailResult> {
+    const user = await this.userDao.findByEmailVerificationTokenValue(verificationToken);
     if (!user) throw new HttpError(400, "Invalid or expired verification link");
+
+    if (user.emailVerified) {
+      return { success: false, message: "Email verified already." };
+    }
+
+    const expiresAt = user.emailVerificationTokenExpiresAt;
+    if (!expiresAt || expiresAt.getTime() <= Date.now()) {
+      throw new HttpError(400, "Invalid or expired verification link");
+    }
+
     await this.userDao.markEmailVerified(user.id);
     const updated = await this.userDao.findById(user.id);
     if (!updated) throw new HttpError(500, "User not found after verification");
-    return { user: updated };
+
+    const token = signJwt({ sub: updated.id, email: updated.email });
+    const onboardingState: OnboardingState = this.getOnboardingState(updated);
+    return { success: true, token, user: updated, onboardingState };
   }
 
   async login(input: LoginInput): Promise<{

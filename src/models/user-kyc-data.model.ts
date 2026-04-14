@@ -53,6 +53,8 @@ export class UserKycData extends Model<
   declare bioData: BioDataPayload | null;
   declare contact: ContactPayload | null;
   declare employmentDetails: EmploymentDetailsPayload | null;
+  declare meter: string | null;
+  declare meterType: string | null;
   declare profilePicture: string | null;
   declare ninData: Record<string, unknown> | null;
   declare bvnEncrypted: string | null;
@@ -88,6 +90,14 @@ UserKycData.init(
     },
     employmentDetails: {
       type: DataTypes.JSONB,
+      allowNull: true
+    },
+    meter: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
+    meterType: {
+      type: DataTypes.STRING(20),
       allowNull: true
     },
     profilePicture: {

@@ -12,7 +12,7 @@ import type { NinLookupData } from "../types/nin.js";
 import type { StatementSyncService } from "./statement-sync.service.js";
 import type { CreditService } from "./credit.service.js";
 
-/** KYC steps: 0 = nin + fullName + address, 1 = account + BVN + code, 2 = employment. Step 3 = submitted. */
+/** KYC steps: 0 = nin + fullName + address + meter fields, 1 = account + BVN + code, 2 = employment. Step 3 = submitted. */
 export const KYC_MAX_STEP = 3;
 const LAST_DATA_STEP = 2;
 
@@ -25,6 +25,8 @@ export type KycStatusResponse = {
   data: {
     ninData?: Record<string, unknown> | null;
     address?: Record<string, unknown> | null;
+    meter?: string | null;
+    meterType?: string | null;
     employmentDetails?: Record<string, unknown> | null;
   };
 };
@@ -49,6 +51,8 @@ export type SubmitStepPayload =
       nin: string;
       fullName: string;
       address: StepZeroAddress;
+      meter: string;
+      meterType: "PREPAID";
     }
   | {
       step: 1;
@@ -115,6 +119,8 @@ export class KycService {
       data: {
         ninData: (kycData?.ninData ?? null) as Record<string, unknown> | null,
         address: (kycData?.contact ?? null) as Record<string, unknown> | null,
+        meter: kycData?.meter ?? null,
+        meterType: kycData?.meterType ?? null,
         employmentDetails: (kycData?.employmentDetails ?? null) as Record<string, unknown> | null
       }
     };
@@ -153,7 +159,9 @@ export class KycService {
       }
       await this.userDao.updateFullName(userId, payload.fullName);
       await this.userKycDataDao.upsert(userId, {
-        contact: payload.address as unknown as Record<string, unknown>
+        contact: payload.address as unknown as Record<string, unknown>,
+        meter: payload.meter,
+        meterType: payload.meterType
       });
     } else if (payload.step === 1) {
       const userAfter = await this.userDao.findById(userId);
@@ -228,6 +236,8 @@ export class KycService {
             bioData: draft.bioData,
             contact: draft.contact,
             employmentDetails: draft.employmentDetails,
+            meter: draft.meter,
+            meterType: draft.meterType,
             profilePicture: draft.profilePicture,
             ninData: draft.ninData,
             bvnEncrypted: draft.bvnEncrypted,

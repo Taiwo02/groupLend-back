@@ -122,25 +122,13 @@ export class UserDao {
     });
   }
 
-  findByEmailVerificationToken(token: string): Promise<User | null> {
-    const now = new Date();
-    return User.findOne({
-      where: {
-        emailVerificationToken: token,
-        emailVerificationTokenExpiresAt: { [Op.gt]: now }
-      }
-    });
+  /** Lookup by raw verification token (any expiry). Used to detect already-verified replays. */
+  findByEmailVerificationTokenValue(token: string): Promise<User | null> {
+    return User.findOne({ where: { emailVerificationToken: token } });
   }
 
   async markEmailVerified(userId: string): Promise<void> {
-    await User.update(
-      {
-        emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationTokenExpiresAt: null
-      },
-      { where: { id: userId } }
-    );
+    await User.update({ emailVerified: true }, { where: { id: userId } });
   }
 
   async updateProfile(

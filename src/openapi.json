@@ -2233,7 +2233,7 @@
           "Admin · Users & groups"
         ],
         "summary": "Update credit group (admin)",
-        "description": "Partial update: name, description, status, limits, targetCredit, currentCreditPool (adjust pool), creditFrozen (freeze new loans without deactivating).",
+        "description": "Partial update for group credit configuration and risk controls. Supports target credit, credibility (score/level), loan limits, repayment config, interest/penalty config, and credit freeze toggle.",
         "security": [
           {
             "bearerAuth": []
@@ -2271,12 +2271,78 @@
                       "PENDING"
                     ]
                   },
+                  "credibilityScore": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "credibilityLevel": {
+                    "type": "string",
+                    "enum": [
+                      "STANDARD",
+                      "VERIFIED_TRUST_GROUP"
+                    ]
+                  },
                   "maximumAmount": {
                     "type": "number",
                     "nullable": true
                   },
                   "minimumAmount": {
                     "type": "number",
+                    "nullable": true
+                  },
+                  "repaymentPeriod": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "nullable": true
+                  },
+                  "repaymentType": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "monthly",
+                      "quarterly",
+                      "yearly"
+                    ]
+                  },
+                  "interestType": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "flat",
+                      "reducingBalance"
+                    ]
+                  },
+                  "interest": {
+                    "type": "number",
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "penalCharges": {
+                    "type": "number",
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "gracePeriod": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "gracePeriodType": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "monthly",
+                      "quarterly",
+                      "yearly"
+                    ]
+                  },
+                  "overGracePenalCharges": {
+                    "type": "number",
+                    "minimum": 0,
                     "nullable": true
                   },
                   "targetCredit": {

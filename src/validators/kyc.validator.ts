@@ -4,6 +4,8 @@ import { z } from "../utils/request.js";
 export const kycStepZeroSchema = z.object({
   nin: z.string().trim().min(11, "NIN must be at least 11 characters"),
   fullName: z.string().trim().min(1, "fullName is required"),
+  meter: z.string().trim().min(1, "meter is required"),
+  meterType: z.literal("PREPAID"),
   address: z.object({
     addressLine1: z.string().trim().min(1, "addressLine1 is required"),
     town: z.string().trim().min(1, "town is required").optional(),
@@ -43,6 +45,8 @@ export const kycSubmitStepSchema = z.discriminatedUnion("step", [
     step: z.literal(0),
     nin: kycStepZeroSchema.shape.nin,
     fullName: kycStepZeroSchema.shape.fullName,
+    meter: kycStepZeroSchema.shape.meter,
+    meterType: kycStepZeroSchema.shape.meterType,
     address: kycStepZeroSchema.shape.address
   }),
   z.object({
