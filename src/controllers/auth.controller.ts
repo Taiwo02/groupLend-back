@@ -77,11 +77,9 @@ export class AuthController {
       return c.json({ success: false, message: result.message });
     }
     return c.json({
-      success: true,
       token: result.token,
       user: sanitizeUser(result.user),
-      onboardingState: result.onboardingState,
-      message: "Email verified successfully."
+      onboardingState: result.onboardingState
     });
   }
 

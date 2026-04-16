@@ -214,24 +214,22 @@
         },
         "responses": {
           "200": {
-            "description": "Verification result. On first success, returns JWT and sanitized user (same shape as login). If the email was already verified, returns `success: false` with HTTP 200.",
+            "description": "On first successful verification, body is **identical** to `POST /auth/login` 200: `token`, `user` (sanitized), `onboardingState`. If the email was already verified (e.g. link opened twice), returns `success: false` and `message` with HTTP 200.",
             "content": {
               "application/json": {
                 "schema": {
                   "oneOf": [
-                    { "$ref": "#/components/schemas/VerifyEmailSuccess" },
+                    { "$ref": "#/components/schemas/AuthLoginSuccess" },
                     { "$ref": "#/components/schemas/VerifyEmailAlready" }
                   ]
                 },
                 "examples": {
                   "firstSuccess": {
-                    "summary": "First-time verification",
+                    "summary": "First-time verification (same as login response)",
                     "value": {
-                      "success": true,
                       "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                       "user": { "id": "550e8400-e29b-41d4-a716-446655440000", "email": "user@example.com", "pin": false },
-                      "onboardingState": "INCOME_PENDING",
-                      "message": "Email verified successfully."
+                      "onboardingState": "INCOME_PENDING"
                     }
                   },
                   "alreadyVerified": {
@@ -766,22 +764,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "token": {
-                      "type": "string"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    },
-                    "onboardingState": {
-                      "type": "string",
-                      "enum": [
-                        "INCOME_PENDING",
-                        "ONBOARDING_COMPLETE"
-                      ]
-                    }
-                  }
+                  "$ref": "#/components/schemas/AuthLoginSuccess"
                 }
               }
             }
@@ -5264,7 +5247,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT from login or signup"
+        "description": "JWT from login, verify-email (first success), or signup flows that return a token"
       }
     },
     "schemas": {
@@ -5279,14 +5262,14 @@
           }
         }
       },
-      "VerifyEmailSuccess": {
+      "AuthLoginSuccess": {
         "type": "object",
-        "required": ["success", "token", "user", "onboardingState", "message"],
+        "required": ["token", "user", "onboardingState"],
+        "description": "Returned by POST /auth/login on success and by POST /auth/verify-email on first successful email verification (same contract).",
         "properties": {
-          "success": { "type": "boolean", "description": "Always true for this response variant" },
           "token": {
             "type": "string",
-            "description": "JWT; same shape as login — use for Authorization: Bearer until expiry"
+            "description": "JWT for Authorization: Bearer"
           },
           "user": {
             "$ref": "#/components/schemas/User",
@@ -5295,9 +5278,8 @@
           "onboardingState": {
             "type": "string",
             "enum": ["INCOME_PENDING", "ONBOARDING_COMPLETE"],
-            "description": "Same as login: income step vs onboarding complete"
-          },
-          "message": { "type": "string", "example": "Email verified successfully." }
+            "description": "INCOME_PENDING until monthly income is submitted; then ONBOARDING_COMPLETE"
+          }
         }
       },
       "VerifyEmailAlready": {
