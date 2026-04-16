@@ -43,6 +43,7 @@ export function createAdminRoutes(
   routes.get("/users/:id", (c) => adminUsersController.getUser(c));
   routes.get("/kyc/count", (c) => adminKycController.getKycCount(c));
   routes.get("/kyc", (c) => adminKycController.getKycList(c));
+  routes.get("/kyc/groups/:groupId/members", (c) => adminKycController.getGroupMembersKyc(c));
   routes.get("/kyc/:kycId", (c) => adminKycController.getKycDetails(c));
   routes.post("/kyc/:kycId/approve", (c) => adminKycController.approveKyc(c));
   routes.post("/kyc/:kycId/reject", (c) => adminKycController.rejectKyc(c));

@@ -1,6 +1,8 @@
 import { Context } from "hono";
 import { AdminKycService } from "../services/admin-kyc.service.js";
 import { KycStatus } from "../models/enums.js";
+import { parseWithSchema } from "../utils/request.js";
+import { groupIdParamSchema } from "../validators/group.validator.js";
 
 const VALID_USER_KYC_STATUSES = new Set<string>(Object.values(KycStatus));
 
@@ -33,6 +35,12 @@ export class AdminKycController {
   async getKycDetails(c: Context): Promise<Response> {
     const kycId = c.req.param("kycId");
     const data = await this.adminKycService.getKycDetails(kycId);
+    return c.json(data);
+  }
+
+  async getGroupMembersKyc(c: Context): Promise<Response> {
+    const { id } = parseWithSchema(groupIdParamSchema, { id: c.req.param("groupId") });
+    const data = await this.adminKycService.getGroupMembersKyc(id);
     return c.json(data);
   }
 

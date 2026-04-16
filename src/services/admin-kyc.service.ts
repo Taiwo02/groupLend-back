@@ -2,7 +2,9 @@ import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
-import { KycStatus } from "../models/enums.js";
+import { Op } from "sequelize";
+import { Group, GroupMember, KycVerification, User, UserKycData } from "../models/index.js";
+import { GroupMemberStatus, KycStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { decryptBvn } from "../utils/encryption.js";
 import {
@@ -28,7 +30,13 @@ export type AdminKycListItem = {
   email: string;
   /** User's KYC status (users.kycStatus). */
   kycStatus: string;
-  type: "Individual" | "Group Member";
+  type: "Individual" | "Group";
+  is_group: boolean;
+  group: {
+    id: string;
+    groupId: string | null;
+    name: string;
+  } | null;
   submissionDate: string;
   documentStatus: string[];
   riskScore: number;
@@ -38,6 +46,37 @@ export type AdminKycListItem = {
 export type AdminKycListResult = {
   count: number;
   items: AdminKycListItem[];
+};
+
+export type AdminGroupMembersKycItem = {
+  memberId: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  memberStatus: string;
+  kycStatus: string;
+  latestKyc: {
+    kycId: string;
+    kycIdDisplay: string;
+    submittedAt: string | null;
+    status: string;
+    bioData: Record<string, unknown> | null;
+    contact: Record<string, unknown> | null;
+    employmentDetails: Record<string, unknown> | null;
+    ninData: Record<string, unknown> | null;
+    bvnProvided: boolean;
+    profilePicture: string | null;
+  } | null;
+  verification: AdminKycDetailsVerification | null;
+};
+
+export type AdminGroupMembersKycResult = {
+  group: {
+    id: string;
+    groupId: string | null;
+    name: string;
+  };
+  members: AdminGroupMembersKycItem[];
 };
 
 export type AdminKycDetailsVerification = {
@@ -108,7 +147,10 @@ export class AdminKycService {
       records.map((r) => this.kycVerificationDao.findByKycDataId(r.id))
     );
 
-    const items: AdminKycListItem[] = records.map((rec, i) => {
+    const items: AdminKycListItem[] = [];
+    const seenGroupIds = new Set<string>();
+    for (let i = 0; i < records.length; i += 1) {
+      const rec = records[i];
       const u = userMap.get(rec.userId);
       const ver = verifications[i];
       const docStatus: string[] = [];
@@ -119,21 +161,155 @@ export class AdminKycService {
       if (ver?.addressApproved) docStatus.push("✔ Address Verified");
       else if (rec.contact) docStatus.push("🟡 Address Pending");
       if (docStatus.length === 0) docStatus.push("↑ Files Received");
-      return {
+
+      const memberships = ((u as unknown as { groups?: Array<{
+        status?: string;
+        groupId?: string;
+        group?: { id: string; groupId: string | null; name: string };
+      }> | undefined })?.groups ?? []);
+
+      const activeMembership = memberships.find((m) => m.status === GroupMemberStatus.ACTIVE && m.group);
+      const fallbackMembership = memberships.find((m) => m.group);
+      const membership = activeMembership ?? fallbackMembership;
+
+      if (!membership?.group?.id) {
+        items.push({
+          kycId: rec.id,
+          kycIdDisplay: kycIdDisplay(rec.id),
+          userId: rec.userId,
+          fullName: u?.fullName ?? "Unknown",
+          email: u?.email ?? "",
+          kycStatus: u?.kycStatus ?? "PENDING",
+          type: "Individual",
+          is_group: false,
+          group: null,
+          submissionDate: rec.submittedAt ? rec.submittedAt.toISOString() : rec.createdAt.toISOString(),
+          documentStatus: docStatus,
+          riskScore: 0,
+          comment: ver?.comment ?? null
+        });
+        continue;
+      }
+
+      const group = membership.group;
+      if (seenGroupIds.has(group.id)) continue;
+      seenGroupIds.add(group.id);
+
+      items.push({
         kycId: rec.id,
         kycIdDisplay: kycIdDisplay(rec.id),
         userId: rec.userId,
-        fullName: u?.fullName ?? "Unknown",
-        email: u?.email ?? "",
+        fullName: group.name,
+        email: "",
         kycStatus: u?.kycStatus ?? "PENDING",
-        type: "Individual",
+        type: "Group",
+        is_group: true,
+        group: {
+          id: group.id,
+          groupId: group.groupId,
+          name: group.name
+        },
         submissionDate: rec.submittedAt ? rec.submittedAt.toISOString() : rec.createdAt.toISOString(),
         documentStatus: docStatus,
         riskScore: 0,
         comment: ver?.comment ?? null
+      });
+    }
+    return { count: total, items };
+  }
+
+  async getGroupMembersKyc(groupId: string): Promise<AdminGroupMembersKycResult> {
+    const groupRow = await Group.findByPk(groupId, {
+      attributes: ["id", "groupId", "name"],
+      include: [
+        {
+          model: GroupMember,
+          as: "members",
+          required: false,
+          where: { status: { [Op.in]: [GroupMemberStatus.ACTIVE, GroupMemberStatus.INVITED] } },
+          attributes: ["id", "userId", "status", "createdAt"],
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["id", "fullName", "email", "kycStatus"]
+            }
+          ]
+        }
+      ]
+    });
+    if (!groupRow) throw new HttpError(404, "Group not found");
+
+    type GroupMemberWithUser = GroupMember & { user?: User | null };
+    const group = groupRow as Group & { members?: GroupMemberWithUser[] };
+    const members = [...(group.members ?? [])].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const userIds = [...new Set(members.map((m) => m.userId))];
+
+    const kycRecords = userIds.length > 0
+      ? await UserKycData.findAll({
+          where: { userId: { [Op.in]: userIds } },
+          order: [["submittedAt", "DESC"], ["createdAt", "DESC"]]
+        })
+      : [];
+
+    const latestKycByUser = new Map<string, UserKycData>();
+    for (const record of kycRecords) {
+      if (!latestKycByUser.has(record.userId)) {
+        latestKycByUser.set(record.userId, record);
+      }
+    }
+
+    const latestKycIds = [...latestKycByUser.values()].map((r) => r.id);
+    const verifications = latestKycIds.length > 0
+      ? await KycVerification.findAll({ where: { kycDataId: { [Op.in]: latestKycIds } } })
+      : [];
+    const verificationByKycId = new Map(verifications.map((v) => [v.kycDataId, v]));
+
+    const data: AdminGroupMembersKycItem[] = members.map((member) => {
+      const user = member.user;
+      const latest = latestKycByUser.get(member.userId);
+      const verification = latest ? verificationByKycId.get(latest.id) : null;
+
+      return {
+        memberId: member.id,
+        userId: member.userId,
+        fullName: user?.fullName ?? "Unknown",
+        email: user?.email ?? "",
+        memberStatus: member.status,
+        kycStatus: user?.kycStatus ?? KycStatus.PENDING,
+        latestKyc: latest
+          ? {
+              kycId: latest.id,
+              kycIdDisplay: kycIdDisplay(latest.id),
+              submittedAt: latest.submittedAt?.toISOString() ?? null,
+              status: latest.status,
+              bioData: (latest.bioData ?? null) as Record<string, unknown> | null,
+              contact: (latest.contact ?? null) as Record<string, unknown> | null,
+              employmentDetails: (latest.employmentDetails ?? null) as Record<string, unknown> | null,
+              ninData: (latest.ninData ?? null) as Record<string, unknown> | null,
+              bvnProvided: !!(latest.bvnEncrypted?.trim()),
+              profilePicture: latest.profilePicture ?? null
+            }
+          : null,
+        verification: verification
+          ? {
+              ninApproved: verification.ninApproved,
+              bvnApproved: verification.bvnApproved,
+              addressApproved: verification.addressApproved,
+              creditHistoryApproved: verification.creditHistoryApproved,
+              overallStatus: verification.overallStatus,
+              comment: verification.comment
+            }
+          : null
       };
     });
-    return { count: total, items };
+
+    return {
+      group: { id: group.id, groupId: group.groupId, name: group.name },
+      members: data
+    };
   }
 
   /** Get full KYC details by kycId (admin). BVN is not returned; only bvnProvided flag. */
