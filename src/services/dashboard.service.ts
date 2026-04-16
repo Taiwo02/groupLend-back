@@ -1,5 +1,6 @@
 import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
 import { LoanDao } from "../dao/loan.dao.js";
+import { GroupInviteDao } from "../dao/group-invite.dao.js";
 import { GroupMemberDao } from "../dao/group-member.dao.js";
 import { GroupDao } from "../dao/group.dao.js";
 import { UserDao } from "../dao/user.dao.js";
@@ -92,7 +93,13 @@ export type RecentActivityItem = {
 };
 
 export type NonAcceptedMembership = {
-  userId: string;
+  /**
+   * User id when the invitee already has an account (`group_members` INVITED).
+   * Null when the invite is only in `group_invites` (pending signup).
+   */
+  userId: string | null;
+  /** Set when the row comes from `group_invites` (email not registered yet). */
+  inviteId?: string;
   fullName: string;
   email: string;
   status: "INVITED";
@@ -200,6 +207,7 @@ export class DashboardService {
     private readonly loanDao: LoanDao,
     private readonly loanApprovalDao: LoanApprovalDao,
     private readonly groupMemberDao: GroupMemberDao,
+    private readonly groupInviteDao: GroupInviteDao,
     private readonly groupDao: GroupDao,
     private readonly statementDao: StatementDao,
     private readonly repaymentDao: RepaymentDao,
@@ -302,15 +310,41 @@ export class DashboardService {
   }
 
   private async getNonAcceptedMemberships(groupIds: string[]): Promise<NonAcceptedMembership[]> {
-    const invitedByGroup = await Promise.all(
-      groupIds.map((groupId) => this.groupMemberDao.findPendingInvitedMembersByGroupId(groupId))
-    );
-    const invited = invitedByGroup.flat();
-    if (invited.length === 0) return [];
+    const [invitedByGroup, pendingEmailInvites] = await Promise.all([
+      Promise.all(groupIds.map((groupId) => this.groupMemberDao.findPendingInvitedMembersByGroupId(groupId))),
+      this.groupInviteDao.findPendingByGroupIds(groupIds)
+    ]);
+    const invitedMembers = invitedByGroup.flat();
 
-    // De-dupe by userId because a user might appear in multiple groups; the payload doesn't include groupId.
-    const byUserId = new Map<string, (typeof invited)[number]>();
-    for (const m of invited) {
+    const memberUserIds = [...new Set(invitedMembers.map((m) => m.userId))];
+    const users = await Promise.all(memberUserIds.map((id) => this.userDao.findById(id)));
+    const userMap = new Map(memberUserIds.map((id, i) => [id, users[i]]));
+
+    const memberEmailLower = (userId: string): string =>
+      (userMap.get(userId)?.email ?? "").trim().toLowerCase();
+
+    // Pending signups (no account yet) live in `group_invites`. Skip an invite if this group already
+    // has an INVITED `group_members` row for the same email (registered user path).
+    const fromInvites: NonAcceptedMembership[] = pendingEmailInvites
+      .filter((inv) => {
+        const invEmail = inv.email.trim().toLowerCase();
+        const covered = invitedMembers.some(
+          (m) => m.groupId === inv.groupId && memberEmailLower(m.userId) === invEmail
+        );
+        return !covered;
+      })
+      .map((inv) => ({
+        userId: null,
+        inviteId: inv.id,
+        fullName: inv.fullName,
+        email: inv.email,
+        status: "INVITED" as const,
+        invitedAt: inv.createdAt ? inv.createdAt.toISOString() : null
+      }));
+
+    // De-dupe registered invitees by userId (same person invited to multiple groups).
+    const byUserId = new Map<string, (typeof invitedMembers)[number]>();
+    for (const m of invitedMembers) {
       const existing = byUserId.get(m.userId);
       if (!existing) {
         byUserId.set(m.userId, m);
@@ -320,13 +354,9 @@ export class DashboardService {
       const mTime = m.createdAt ? m.createdAt.getTime() : Number.POSITIVE_INFINITY;
       if (mTime < existingTime) byUserId.set(m.userId, m);
     }
-    const uniqueInvited = Array.from(byUserId.values());
+    const uniqueInvitedMembers = Array.from(byUserId.values());
 
-    const userIds = uniqueInvited.map((m) => m.userId);
-    const users = await Promise.all(userIds.map((id) => this.userDao.findById(id)));
-    const userMap = new Map(userIds.map((id, i) => [id, users[i]]));
-
-    return uniqueInvited.map((m) => {
+    const fromMembers: NonAcceptedMembership[] = uniqueInvitedMembers.map((m) => {
       const u = userMap.get(m.userId);
       return {
         userId: m.userId,
@@ -336,6 +366,8 @@ export class DashboardService {
         invitedAt: m.createdAt ? m.createdAt.toISOString() : null
       };
     });
+
+    return [...fromMembers, ...fromInvites];
   }
 
   private trustLevelToBadge(level: string): string {

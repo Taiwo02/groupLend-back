@@ -46,7 +46,20 @@ export class AdminKycController {
 
   async approveKyc(c: Context): Promise<Response> {
     const kycId = c.req.param("kycId");
-    const data = await this.adminKycService.approveKyc(kycId);
+    const body = await c.req.json().catch(() => ({})) as { creditLimit?: unknown };
+    const raw = body.creditLimit;
+    const creditLimit =
+      raw === undefined
+        ? undefined
+        : typeof raw === "number"
+          ? raw
+          : typeof raw === "string" && raw.trim() !== ""
+            ? Number(raw)
+            : NaN;
+    if (creditLimit !== undefined && Number.isNaN(creditLimit)) {
+      return c.json({ error: "creditLimit must be a number" }, 400);
+    }
+    const data = await this.adminKycService.approveKyc(kycId, { creditLimit });
     return c.json(data);
   }
 

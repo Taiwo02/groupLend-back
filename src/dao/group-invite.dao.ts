@@ -35,6 +35,16 @@ export class GroupInviteDao {
     });
   }
 
+  /** Pending email invites for dashboard / admin views (not yet signed up). */
+  findPendingByGroupIds(groupIds: string[], transaction?: Transaction): Promise<GroupInvite[]> {
+    if (groupIds.length === 0) return Promise.resolve([]);
+    return GroupInvite.findAll({
+      where: { groupId: { [Op.in]: groupIds }, status: "pending" },
+      order: [["createdAt", "ASC"]],
+      transaction
+    });
+  }
+
   async markAccepted(id: string, transaction?: Transaction): Promise<void> {
     await GroupInvite.update({ status: "accepted" }, { where: { id }, transaction });
   }

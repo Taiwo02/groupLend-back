@@ -160,6 +160,7 @@ function createContainer() {
     loanDao,
     loanApprovalDao,
     groupMemberDao,
+    groupInviteDao,
     groupDao,
     statementDao,
     repaymentDao,
@@ -168,7 +169,7 @@ function createContainer() {
     directDebitMandateDao
   );
   const adminDashboardService = new AdminDashboardService(loanDao, userDao, userKycDataDao, repaymentDao);
-  const adminKycService = new AdminKycService(userDao, userKycDataDao, kycVerificationDao, statementDao);
+  const adminKycService = new AdminKycService(userDao, userKycDataDao, kycVerificationDao, statementDao, groupMemberDao);
 
   const authController = new AuthController(authService);
   const invitationController = new InvitationController(invitationService);

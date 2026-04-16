@@ -1,3 +1,4 @@
+import { GroupMemberDao } from "../dao/group-member.dao.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
@@ -141,7 +142,8 @@ export class AdminKycService {
     private readonly userDao: UserDao,
     private readonly userKycDataDao: UserKycDataDao,
     private readonly kycVerificationDao: KycVerificationDao,
-    private readonly statementDao: StatementDao
+    private readonly statementDao: StatementDao,
+    private readonly groupMemberDao: GroupMemberDao
   ) {}
 
   /** Count KYC records. Optional users.kycStatus filter and search. No filter = all records. */
@@ -345,7 +347,14 @@ export class AdminKycService {
   }
 
   /** Approve KYC by kycId: update record status, verification flags, and user kycStatus. */
-  async approveKyc(kycId: string): Promise<{ message: string }> {
+  /**
+   * Approve KYC. Optional `creditLimit` updates `users.creditLimit` only when the user has no **active** group
+   * membership (individual borrowers). Group members ignore `creditLimit`.
+   */
+  async approveKyc(
+    kycId: string,
+    opts?: { creditLimit?: number }
+  ): Promise<{ message: string; creditLimitUpdated?: boolean }> {
     const record = await this.userKycDataDao.findById(kycId);
     if (!record) throw new HttpError(404, "KYC record not found");
     if (record.status === "APPROVED") return { message: "KYC is already approved" };
@@ -361,7 +370,23 @@ export class AdminKycService {
       comment: null
     });
     await this.userDao.updateKycStatus(record.userId, KycStatus.APPROVED);
-    return { message: "KYC approved successfully" };
+
+    let creditLimitUpdated: boolean | undefined;
+    if (opts?.creditLimit !== undefined) {
+      const lim = opts.creditLimit;
+      if (typeof lim !== "number" || !Number.isFinite(lim) || lim < 0) {
+        throw new HttpError(400, "creditLimit must be a non-negative number");
+      }
+      const activeGroupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(record.userId);
+      if (activeGroupIds.length === 0) {
+        await this.userDao.updateCreditLimit(record.userId, lim);
+        creditLimitUpdated = true;
+      } else {
+        creditLimitUpdated = false;
+      }
+    }
+
+    return { message: "KYC approved successfully", ...(creditLimitUpdated !== undefined && { creditLimitUpdated }) };
   }
 
   /** Reject KYC by kycId. Optionally set comment for the user. */
