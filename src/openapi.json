@@ -214,17 +214,31 @@
         },
         "responses": {
           "200": {
-            "description": "Email verified. User can now sign in.",
+            "description": "Verification result. On first success, returns JWT and sanitized user (same shape as login). If the email was already verified, returns `success: false` with HTTP 200.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/VerifyEmailSuccess" },
+                    { "$ref": "#/components/schemas/VerifyEmailAlready" }
+                  ]
+                },
+                "examples": {
+                  "firstSuccess": {
+                    "summary": "First-time verification",
+                    "value": {
+                      "success": true,
+                      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                      "user": { "id": "550e8400-e29b-41d4-a716-446655440000", "email": "user@example.com", "pin": false },
+                      "onboardingState": "INCOME_PENDING",
+                      "message": "Email verified successfully."
+                    }
+                  },
+                  "alreadyVerified": {
+                    "summary": "Link reused after verification",
+                    "value": {
+                      "success": false,
+                      "message": "Email verified already."
                     }
                   }
                 }
@@ -3036,7 +3050,7 @@
           "Admin · KYC"
         ],
         "summary": "List KYC records",
-        "description": "Returns all user_kyc_data rows when no filters. Optional `status` filters by users.kycStatus. Optional `search` by user fullName or email.",
+        "description": "Returns user_kyc_data–backed rows when no filters. Optional `status` filters by users.kycStatus. Optional `search` by user fullName or email. **Group aggregation:** users who are active group members appear once per group (one row per group, `type` Group, `is_group` true); others appear as Individual rows. `count` is total matching KYC rows before group collapse, not the length of `items`.",
         "security": [
           {
             "bearerAuth": []
@@ -3106,56 +3120,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "kycId": {
-                            "type": "string",
-                            "format": "uuid",
-                            "description": "Unique KYC record ID (use for details and approve)"
-                          },
-                          "kycIdDisplay": {
-                            "type": "string",
-                            "description": "Display ID e.g. KYC-77210"
-                          },
-                          "userId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "fullName": {
-                            "type": "string"
-                          },
-                          "email": {
-                            "type": "string"
-                          },
-                          "kycStatus": {
-                            "type": "string",
-                            "description": "users.kycStatus"
-                          },
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "Individual",
-                              "Group Member"
-                            ]
-                          },
-                          "submissionDate": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "documentStatus": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "riskScore": {
-                            "type": "number"
-                          },
-                          "comment": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        }
+                        "$ref": "#/components/schemas/AdminKycListItem"
                       }
                     }
                   }
@@ -3165,6 +3130,51 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/admin/kyc/groups/{groupId}/members": {
+      "get": {
+        "operationId": "adminListGroupMembersKyc",
+        "tags": [
+          "Admin · KYC"
+        ],
+        "summary": "List group members KYC",
+        "description": "Returns the credit group header plus one list item per member (active or invited), each item matching the same shape as GET /admin/kyc individual rows (`AdminKycListItem`). Use `kycId` from an item with GET /admin/kyc/{kycId} for full payload when present.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "description": "Group primary key (UUID)",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminGroupMembersKycResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Group not found"
           }
         }
       }
@@ -3301,7 +3311,7 @@
           "Admin · KYC"
         ],
         "summary": "Approve KYC",
-        "description": "Approve KYC by kycId. Sets KYC record status to APPROVED, verification flags, and user kycStatus to APPROVED. Use kycId (not userId) because a user can have multiple KYC records.",
+        "description": "Approve KYC by kycId. Sets KYC record status to APPROVED, verification flags, and user kycStatus to APPROVED. Use kycId (not userId) because a user can have multiple KYC records. Optional `creditLimit` updates `users.creditLimit` only for **individual** borrowers (no active group membership); it is ignored for active group members.",
         "security": [
           {
             "bearerAuth": []
@@ -3318,24 +3328,36 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "creditLimit": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "When set, updates the user's credit limit on approve (individuals only)"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/AdminKycApproveResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "KYC already approved or cannot approve rejected KYC"
+            "description": "Invalid creditLimit, KYC already approved, or cannot approve rejected KYC"
           },
           "401": {
             "description": "Unauthorized"
@@ -3385,15 +3407,6 @@
         },
         "responses": {
           "200": {
-            "400": {
-              "description": "Cannot reject approved KYC"
-            },
-            "401": {
-              "description": "Unauthorized"
-            },
-            "404": {
-              "description": "KYC record not found"
-            },
             "description": "OK",
             "content": {
               "application/json": {
@@ -3407,6 +3420,15 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Cannot reject approved KYC"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "KYC record not found"
           }
         }
       }
@@ -5254,6 +5276,129 @@
           },
           "service": {
             "type": "string"
+          }
+        }
+      },
+      "VerifyEmailSuccess": {
+        "type": "object",
+        "required": ["success", "token", "user", "onboardingState", "message"],
+        "properties": {
+          "success": { "type": "boolean", "description": "Always true for this response variant" },
+          "token": {
+            "type": "string",
+            "description": "JWT; same shape as login — use for Authorization: Bearer until expiry"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User",
+            "description": "Sanitized user (no secrets); `pin` is boolean loan-PIN set flag"
+          },
+          "onboardingState": {
+            "type": "string",
+            "enum": ["INCOME_PENDING", "ONBOARDING_COMPLETE"],
+            "description": "Same as login: income step vs onboarding complete"
+          },
+          "message": { "type": "string", "example": "Email verified successfully." }
+        }
+      },
+      "VerifyEmailAlready": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": { "type": "boolean", "description": "Always false when email was already verified" },
+          "message": { "type": "string", "example": "Email verified already." }
+        },
+        "description": "Returned when the account was already verified (e.g. verification link opened again)."
+      },
+      "AdminKycListItem": {
+        "type": "object",
+        "required": [
+          "kycId",
+          "kycIdDisplay",
+          "userId",
+          "fullName",
+          "email",
+          "kycStatus",
+          "type",
+          "is_group",
+          "group",
+          "submissionDate",
+          "documentStatus",
+          "riskScore",
+          "comment"
+        ],
+        "properties": {
+          "kycId": {
+            "type": "string",
+            "description": "Primary key of user_kyc_data. May be empty string when a member has no KYC row yet (group drill-down only)."
+          },
+          "kycIdDisplay": {
+            "type": "string",
+            "description": "Human-readable id e.g. KYC-77210, or an em dash when kycId is empty"
+          },
+          "userId": { "type": "string", "format": "uuid" },
+          "fullName": { "type": "string" },
+          "email": { "type": "string" },
+          "kycStatus": {
+            "type": "string",
+            "description": "users.kycStatus"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["Individual", "Group"],
+            "description": "Individual = person-level row; Group = collapsed row representing the whole credit group (list only)"
+          },
+          "is_group": {
+            "type": "boolean",
+            "description": "True when this list row is the single aggregated row for a group; false for a person"
+          },
+          "group": {
+            "type": "object",
+            "nullable": true,
+            "description": "Set when type is Group; null for individuals",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "groupId": { "type": "string", "nullable": true },
+              "name": { "type": "string" }
+            }
+          },
+          "submissionDate": { "type": "string", "format": "date-time" },
+          "documentStatus": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Human-readable document / verification line items for the admin queue"
+          },
+          "riskScore": { "type": "number" },
+          "comment": { "type": "string", "nullable": true }
+        }
+      },
+      "AdminGroupMembersKycResponse": {
+        "type": "object",
+        "required": ["group", "members"],
+        "properties": {
+          "group": {
+            "type": "object",
+            "required": ["id", "groupId", "name"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "groupId": { "type": "string", "nullable": true },
+              "name": { "type": "string" }
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminKycListItem" },
+            "description": "Same item shape as GET /admin/kyc (individual-style rows per member)"
+          }
+        }
+      },
+      "AdminKycApproveResponse": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "creditLimitUpdated": {
+            "type": "boolean",
+            "description": "Present only when the request included `creditLimit`. True if users.creditLimit was updated (individual borrower); false if the user is an active group member (limit ignored)."
           }
         }
       },
