@@ -28,6 +28,7 @@ import { addLocalDays, addLocalMonths, toLocalDateYmd } from "../utils/mandate-p
 import { toNumber } from "../utils/number.js";
 import { EmailService } from "../email/email.service.js";
 import { NotificationService } from "./notification.service.js";
+import { CreditService } from "./credit.service.js";
 
 export type LoanRequestInput = {
   borrowerId: string;
@@ -41,15 +42,18 @@ export type GroupLoanRequestInput = LoanRequestInput & {
   groupId: string;
 };
 
-/** 40% of annual income per member; group access amount = sum of this over members. */
+/** 40% of annual income for individual mandate totals only. */
 const ACCESS_INCOME_RATIO = 0.4;
 const MONTHS_PER_YEAR = 12;
+/** Group mandate spans 12 months; `maximumAmount` is the six-month access cap. */
+const SEMESTERS_PER_MANDATE_YEAR = 2;
 
 export class LoanService {
   constructor(
     private readonly dbDao: DbDao,
     private readonly userDao: UserDao,
     private readonly groupDao: GroupDao,
+    private readonly creditService: CreditService,
     private readonly groupMemberDao: GroupMemberDao,
     private readonly loanDao: LoanDao,
     private readonly loanApprovalDao: LoanApprovalDao,
@@ -119,6 +123,13 @@ export class LoanService {
     if (!group) throw new HttpError(404, "Group not found");
     if (group.creditFrozen) {
       throw new HttpError(403, "This group's credit is frozen by an administrator");
+    }
+
+    const groupMaxApply = group.maximumAmount != null ? toNumber(group.maximumAmount) : 0;
+    if (groupMaxApply > 0 && input.amount > groupMaxApply) {
+      throw new HttpError(400, "Amount exceeds the group's maximum loan amount for this six-month access period", {
+        maxAmount: Number(groupMaxApply.toFixed(2))
+      });
     }
 
     const borrowerMembership = await this.groupMemberDao.findByGroupAndUser(
@@ -246,22 +257,21 @@ export class LoanService {
 
   /**
    * Create a new group mandate period: starts local today + 25 days, ends 12 calendar months after start.
-   * `year` column = calendar year of period start (for legacy index UNIQUE(groupId, year)).
-   * Group access amount = sum of 40% of each member's annual income (unchanged formula).
+   * `year` column encodes period start as YYYYMMDD (UNIQUE with groupId).
+   * `totalAccessAmount`: if the group has `maximumAmount`, use two × that (two six-month windows in the year);
+   * otherwise use computed `targetCredit` (member income formula).
    */
   private async ensureMandateForGroup(groupId: string, transaction: Transaction): Promise<Mandate> {
+    const groupRow = await this.groupDao.findById(groupId, transaction);
+    if (!groupRow) throw new HttpError(404, "Group not found");
+
+    const maxHalfYear = groupRow.maximumAmount != null ? toNumber(groupRow.maximumAmount) : 0;
+    const totalAccessAmount =
+      maxHalfYear > 0
+        ? Number((maxHalfYear * SEMESTERS_PER_MANDATE_YEAR).toFixed(2))
+        : await this.creditService.calculateGroupTargetCredit(groupId, transaction);
+
     const activeMembers = await this.groupMemberDao.findActiveMembersByGroupId(groupId, transaction);
-    const userIds = activeMembers.map((m) => m.userId);
-    const users = await this.userDao.findByIdsWithKyc(userIds, transaction);
-    const kycIncomes = await this.userKycDataDao.findEffectiveEmploymentIncomeByUserIds(userIds, transaction);
-    let totalAccessAmount = 0;
-    for (const u of users) {
-      const fromUser = toNumber(u.monthlyIncome ?? 0);
-      const fromKyc = kycIncomes.get(u.id) ?? 0;
-      const income = fromUser > 0 ? fromUser : fromKyc;
-      totalAccessAmount += ACCESS_INCOME_RATIO * MONTHS_PER_YEAR * income;
-    }
-    totalAccessAmount = Number(totalAccessAmount.toFixed(2));
 
     const startDate = addLocalDays(new Date(), 25);
     const endDate = addLocalMonths(startDate, 12);
@@ -290,7 +300,7 @@ export class LoanService {
 
   /**
    * Create a new individual mandate period: starts local today + 25 days, ends 12 calendar months after start.
-   * totalAccessAmount = 40% of user's annual income (same ratio as group mandate per-member calculation).
+   * totalAccessAmount = 40% of user's annual income.
    */
   async ensureMandateForUser(userId: string, transaction: Transaction): Promise<UserMandate> {
     const user = await this.userDao.findById(userId, transaction);

@@ -10,7 +10,8 @@ import { GroupMandateStatus } from "./enums.js";
 
 /**
  * Group-level mandate for a rolling period (start/end DATEONLY).
- * The group access amount (totalAccessAmount) is the sum of 40% of each member's annual income.
+ * `totalAccessAmount` is usually 2 × group `maximumAmount` (two six-month windows in the mandate year),
+ * or the computed group target credit from member incomes when `maximumAmount` is not set.
  */
 export class Mandate extends Model<InferAttributes<Mandate>, InferCreationAttributes<Mandate>> {
   declare id: CreationOptional<string>;
@@ -20,7 +21,7 @@ export class Mandate extends Model<InferAttributes<Mandate>, InferCreationAttrib
    * Not the calendar year alone — avoids unique conflicts when a new period starts in the same calendar year as an expired row.
    */
   declare year: number;
-  /** Total access amount = sum(40% of each member's annual income). */
+  /** Total access cap for the mandate period (see class JSDoc). */
   declare totalAccessAmount: number;
   declare status: GroupMandateStatus;
   declare startDate: Date;

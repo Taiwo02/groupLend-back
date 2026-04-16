@@ -374,13 +374,17 @@ export class DashboardService {
     const statementByUser = new Map<string, Statement>();
     statements.forEach((s) => statementByUser.set(s.userId, s));
 
-    const CONTRIBUTION_MULTIPLIER = 2;
+    /** Per-member slice before group bonus: 40% of monthly income × 6 (aligns with targetCredit formula). */
+    const CONTRIBUTION_MONTHLY_FACTOR = 0.4 * 6;
     const membersList: GroupOnboardingMember[] = allMembers.map((m) => {
       const u = userMap.get(m.userId);
       const revenue = u ? getRevenueStatus(u) : "pending";
       const kyc = u ? getKycCompleteStatus(u) : "pending";
       const bank = getBankStatementStatus(statementByUser.get(m.userId) ?? null);
-      const contribution = u && u.monthlyIncome != null ? toNumber(u.monthlyIncome) * CONTRIBUTION_MULTIPLIER : 0;
+      const contribution =
+        u && u.monthlyIncome != null
+          ? Number((CONTRIBUTION_MONTHLY_FACTOR * toNumber(u.monthlyIncome)).toFixed(2))
+          : 0;
       const isYou = m.userId === currentUserId;
       const action = getMemberAction(isYou, revenue, kyc, bank);
       const role = effectiveGroupMemberRole(group.createdBy, m.userId, m.role as GroupMemberRole);

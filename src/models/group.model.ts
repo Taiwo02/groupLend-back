@@ -126,12 +126,12 @@ Group.init(
     gracePeriod: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      defaultValue: 2
+      defaultValue: 6
     },
     gracePeriodType: {
       type: DataTypes.STRING(20),
       allowNull: true,
-      defaultValue: RepaymentType.DAILY
+      defaultValue: RepaymentType.MONTHLY
     },
     overGracePenalCharges: {
       type: DataTypes.DECIMAL(8, 4),

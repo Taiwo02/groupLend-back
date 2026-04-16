@@ -17,6 +17,7 @@ import {
 /** Format kycId for display (e.g. KYC-77210). */
 function kycIdDisplay(id: string): string {
   const short = id.replace(/-/g, "").slice(-5);
+  if (!short) return "—";
   return `KYC-${short}`;
 }
 
@@ -48,27 +49,53 @@ export type AdminKycListResult = {
   items: AdminKycListItem[];
 };
 
-export type AdminGroupMembersKycItem = {
-  memberId: string;
+function documentStatusForListItem(rec: UserKycData | null, ver: KycVerification | null): string[] {
+  if (!rec) return ["↑ No KYC submitted"];
+  const docStatus: string[] = [];
+  if (ver?.ninApproved) docStatus.push("\u2714 NIN Verified");
+  else if (rec.ninData) docStatus.push("\uD83D\uDFE1 NIN Pending");
+  if (ver?.bvnApproved) docStatus.push("\u2714 BVN Verified");
+  else if (rec.bvnEncrypted) docStatus.push("\uD83D\uDFE1 BVN Pending");
+  if (ver?.addressApproved) docStatus.push("\u2714 Address Verified");
+  else if (rec.contact) docStatus.push("\uD83D\uDFE1 Address Pending");
+  if (docStatus.length === 0) docStatus.push("↑ Files Received");
+  return docStatus;
+}
+
+function buildAdminKycListItem(params: {
   userId: string;
-  fullName: string;
-  email: string;
-  memberStatus: string;
-  kycStatus: string;
-  latestKyc: {
-    kycId: string;
-    kycIdDisplay: string;
-    submittedAt: string | null;
-    status: string;
-    bioData: Record<string, unknown> | null;
-    contact: Record<string, unknown> | null;
-    employmentDetails: Record<string, unknown> | null;
-    ninData: Record<string, unknown> | null;
-    bvnProvided: boolean;
-    profilePicture: string | null;
-  } | null;
-  verification: AdminKycDetailsVerification | null;
-};
+  user: User | null | undefined;
+  rec: UserKycData | null;
+  ver: KycVerification | null;
+  type: "Individual" | "Group";
+  is_group: boolean;
+  group: AdminKycListItem["group"];
+  submissionFallback: Date;
+  displayOverride?: { fullName?: string; email?: string };
+}): AdminKycListItem {
+  const { userId, user: u, rec, ver, type, is_group, group, submissionFallback, displayOverride } = params;
+  const kycId = rec?.id ?? "";
+  const submissionDate = rec
+    ? rec.submittedAt
+      ? rec.submittedAt.toISOString()
+      : rec.createdAt.toISOString()
+    : submissionFallback.toISOString();
+  return {
+    kycId,
+    kycIdDisplay: kycIdDisplay(kycId),
+    userId,
+    fullName: displayOverride?.fullName ?? u?.fullName ?? "Unknown",
+    email: displayOverride?.email ?? u?.email ?? "",
+    kycStatus: u?.kycStatus ?? KycStatus.PENDING,
+    type,
+    is_group,
+    group,
+    submissionDate,
+    documentStatus: documentStatusForListItem(rec, ver),
+    riskScore: 0,
+    comment: ver?.comment ?? null
+  };
+}
 
 export type AdminGroupMembersKycResult = {
   group: {
@@ -76,7 +103,8 @@ export type AdminGroupMembersKycResult = {
     groupId: string | null;
     name: string;
   };
-  members: AdminGroupMembersKycItem[];
+  /** Same shape as each item from `GET /admin/kyc` (individual rows). */
+  members: AdminKycListItem[];
 };
 
 export type AdminKycDetailsVerification = {
@@ -153,14 +181,6 @@ export class AdminKycService {
       const rec = records[i];
       const u = userMap.get(rec.userId);
       const ver = verifications[i];
-      const docStatus: string[] = [];
-      if (ver?.ninApproved) docStatus.push("✔ NIN Verified");
-      else if (rec.ninData) docStatus.push("🟡 NIN Pending");
-      if (ver?.bvnApproved) docStatus.push("✔ BVN Verified");
-      else if (rec.bvnEncrypted) docStatus.push("🟡 BVN Pending");
-      if (ver?.addressApproved) docStatus.push("✔ Address Verified");
-      else if (rec.contact) docStatus.push("🟡 Address Pending");
-      if (docStatus.length === 0) docStatus.push("↑ Files Received");
 
       const memberships = ((u as unknown as { groups?: Array<{
         status?: string;
@@ -173,47 +193,42 @@ export class AdminKycService {
       const membership = activeMembership ?? fallbackMembership;
 
       if (!membership?.group?.id) {
-        items.push({
-          kycId: rec.id,
-          kycIdDisplay: kycIdDisplay(rec.id),
-          userId: rec.userId,
-          fullName: u?.fullName ?? "Unknown",
-          email: u?.email ?? "",
-          kycStatus: u?.kycStatus ?? "PENDING",
-          type: "Individual",
-          is_group: false,
-          group: null,
-          submissionDate: rec.submittedAt ? rec.submittedAt.toISOString() : rec.createdAt.toISOString(),
-          documentStatus: docStatus,
-          riskScore: 0,
-          comment: ver?.comment ?? null
-        });
+        items.push(
+          buildAdminKycListItem({
+            userId: rec.userId,
+            user: u,
+            rec,
+            ver,
+            type: "Individual",
+            is_group: false,
+            group: null,
+            submissionFallback: rec.createdAt
+          })
+        );
         continue;
       }
 
-      const group = membership.group;
-      if (seenGroupIds.has(group.id)) continue;
-      seenGroupIds.add(group.id);
+      const grp = membership.group;
+      if (seenGroupIds.has(grp.id)) continue;
+      seenGroupIds.add(grp.id);
 
-      items.push({
-        kycId: rec.id,
-        kycIdDisplay: kycIdDisplay(rec.id),
-        userId: rec.userId,
-        fullName: group.name,
-        email: "",
-        kycStatus: u?.kycStatus ?? "PENDING",
-        type: "Group",
-        is_group: true,
-        group: {
-          id: group.id,
-          groupId: group.groupId,
-          name: group.name
-        },
-        submissionDate: rec.submittedAt ? rec.submittedAt.toISOString() : rec.createdAt.toISOString(),
-        documentStatus: docStatus,
-        riskScore: 0,
-        comment: ver?.comment ?? null
-      });
+      items.push(
+        buildAdminKycListItem({
+          userId: rec.userId,
+          user: u,
+          rec,
+          ver,
+          type: "Group",
+          is_group: true,
+          group: {
+            id: grp.id,
+            groupId: grp.groupId,
+            name: grp.name
+          },
+          submissionFallback: rec.createdAt,
+          displayOverride: { fullName: grp.name, email: "" }
+        })
+      );
     }
     return { count: total, items };
   }
@@ -267,43 +282,20 @@ export class AdminKycService {
       : [];
     const verificationByKycId = new Map(verifications.map((v) => [v.kycDataId, v]));
 
-    const data: AdminGroupMembersKycItem[] = members.map((member) => {
+    const data: AdminKycListItem[] = members.map((member) => {
       const user = member.user;
-      const latest = latestKycByUser.get(member.userId);
-      const verification = latest ? verificationByKycId.get(latest.id) : null;
-
-      return {
-        memberId: member.id,
+      const latest = latestKycByUser.get(member.userId) ?? null;
+      const verification = latest ? verificationByKycId.get(latest.id) ?? null : null;
+      return buildAdminKycListItem({
         userId: member.userId,
-        fullName: user?.fullName ?? "Unknown",
-        email: user?.email ?? "",
-        memberStatus: member.status,
-        kycStatus: user?.kycStatus ?? KycStatus.PENDING,
-        latestKyc: latest
-          ? {
-              kycId: latest.id,
-              kycIdDisplay: kycIdDisplay(latest.id),
-              submittedAt: latest.submittedAt?.toISOString() ?? null,
-              status: latest.status,
-              bioData: (latest.bioData ?? null) as Record<string, unknown> | null,
-              contact: (latest.contact ?? null) as Record<string, unknown> | null,
-              employmentDetails: (latest.employmentDetails ?? null) as Record<string, unknown> | null,
-              ninData: (latest.ninData ?? null) as Record<string, unknown> | null,
-              bvnProvided: !!(latest.bvnEncrypted?.trim()),
-              profilePicture: latest.profilePicture ?? null
-            }
-          : null,
-        verification: verification
-          ? {
-              ninApproved: verification.ninApproved,
-              bvnApproved: verification.bvnApproved,
-              addressApproved: verification.addressApproved,
-              creditHistoryApproved: verification.creditHistoryApproved,
-              overallStatus: verification.overallStatus,
-              comment: verification.comment
-            }
-          : null
-      };
+        user,
+        rec: latest,
+        ver: verification,
+        type: "Individual",
+        is_group: false,
+        group: null,
+        submissionFallback: member.createdAt
+      });
     });
 
     return {

@@ -5,6 +5,11 @@ import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { toNumber } from "../utils/number.js";
 
+/** Per member: 40% of monthly income × 6 months; then group total = sum + 50% of that sum. */
+const GROUP_TARGET_INCOME_SHARE = 0.4;
+const GROUP_TARGET_MONTHS = 6;
+const GROUP_TARGET_SUM_BONUS = 0.5;
+
 export class CreditService {
   constructor(
     private readonly groupMemberDao: GroupMemberDao,
@@ -18,11 +23,10 @@ export class CreditService {
   }
 
   /**
-   * Group pool = sum over active members of (effective monthly income × 2).
-   * Uses `users.monthlyIncome` when set; otherwise falls back to KYC `employmentDetails.monthlyIncome`
-   * (KYC step 2 does not always sync to the user row until we persist it).
+   * Group `targetCredit`: for each active member, (40% of monthly income × 6), summed;
+   * then add 50% of that sum. Uses `users.monthlyIncome` when set; otherwise KYC employment income.
    */
-  async calculateGroupCreditLimit(groupId: string, transaction?: Transaction): Promise<number> {
+  async calculateGroupTargetCredit(groupId: string, transaction?: Transaction): Promise<number> {
     const activeMembers = await this.groupMemberDao.findActiveMemberUserIds(groupId, transaction);
 
     if (!activeMembers.length) return 0;
@@ -33,20 +37,43 @@ export class CreditService {
       this.userKycDataDao.findEffectiveEmploymentIncomeByUserIds(userIds, transaction)
     ]);
 
-    return members.reduce((sum, member) => {
+    const memberSum = members.reduce((sum, member) => {
       const fromUser = toNumber(member.monthlyIncome ?? 0);
       const fromKyc = kycIncomes.get(member.id) ?? 0;
       const income = fromUser > 0 ? fromUser : fromKyc;
-      return sum + income * 2;
+      return sum + GROUP_TARGET_INCOME_SHARE * income * GROUP_TARGET_MONTHS;
     }, 0);
+
+    const target = memberSum * (1 + GROUP_TARGET_SUM_BONUS);
+    return Number(target.toFixed(2));
   }
 
-  /** Recompute `currentCreditPool` for every group the user is an active member of. */
+  /**
+   * Backwards-compatible alias: same as {@link calculateGroupTargetCredit}.
+   */
+  async calculateGroupCreditLimit(groupId: string, transaction?: Transaction): Promise<number> {
+    return this.calculateGroupTargetCredit(groupId, transaction);
+  }
+
+  /**
+   * Persist computed group credit: updates both `targetCredit` and `currentCreditPool`
+   * (same as existing recalc behaviour, which replaced the pool with the computed figure).
+   */
+  async applyComputedGroupCredit(groupId: string, transaction?: Transaction): Promise<number> {
+    const target = await this.calculateGroupTargetCredit(groupId, transaction);
+    await this.groupDao.updateGroup(
+      groupId,
+      { targetCredit: target, currentCreditPool: target },
+      transaction
+    );
+    return target;
+  }
+
+  /** Recompute `targetCredit` and `currentCreditPool` for every group the user is an active member of. */
   async recalculatePoolsForUserGroups(userId: string, transaction?: Transaction): Promise<void> {
     const groupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId, transaction);
     for (const gid of groupIds) {
-      const pool = await this.calculateGroupCreditLimit(gid, transaction);
-      await this.groupDao.updateCreditPool(gid, pool, transaction);
+      await this.applyComputedGroupCredit(gid, transaction);
     }
   }
 }

@@ -152,8 +152,7 @@ export class InvitationService {
       }
       await this.groupInviteDao.markAccepted(inviteId, transaction);
       await this.groupInviteDao.markExpiredForEmail(normalizedEmail, inviteId, transaction);
-      const pool = await this.creditService.calculateGroupCreditLimit(groupId, transaction);
-      await this.groupDao.updateCreditPool(groupId, pool, transaction);
+      await this.creditService.applyComputedGroupCredit(groupId, transaction);
     });
 
     const jwt = signJwt({ sub: user.id, email: user.email });
@@ -176,8 +175,7 @@ export class InvitationService {
     await this.dbDao.withTransaction(async (transaction: Transaction) => {
       await this.groupMemberDao.updateMemberStatus(groupId, userId, GroupMemberStatus.ACTIVE, transaction);
       await this.groupMemberDao.clearInvitationToken(token, transaction);
-      const pool = await this.creditService.calculateGroupCreditLimit(groupId, transaction);
-      await this.groupDao.updateCreditPool(groupId, pool, transaction);
+      await this.creditService.applyComputedGroupCredit(groupId, transaction);
     });
     return { message: "You have joined the group.", groupId };
   }

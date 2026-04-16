@@ -93,6 +93,7 @@ function createContainer() {
     dbDao,
     userDao,
     groupDao,
+    creditService,
     groupMemberDao,
     loanDao,
     loanApprovalDao,

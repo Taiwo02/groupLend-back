@@ -98,8 +98,7 @@ export class GroupService {
         transaction
       );
 
-      const pool = await this.creditService.calculateGroupCreditLimit(group.id, transaction);
-      await this.groupDao.updateCreditPool(group.id, pool, transaction);
+      await this.creditService.applyComputedGroupCredit(group.id, transaction);
 
       const now = new Date();
       const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
@@ -266,9 +265,7 @@ export class GroupService {
   }
 
   async computeGroupCreditPool(groupId: string, transaction?: Transaction): Promise<number> {
-    const pool = await this.creditService.calculateGroupCreditLimit(groupId, transaction);
-    await this.groupDao.updateCreditPool(groupId, pool, transaction);
-    return pool;
+    return this.creditService.applyComputedGroupCredit(groupId, transaction);
   }
 
   async getGroup(groupId: string, userId: string): Promise<Group> {
