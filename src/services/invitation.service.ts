@@ -20,6 +20,7 @@ export type InvitationInfo =
       email: string;
       fullName: string;
       phone: string | null;
+      user: object | null;
     }
   | {
       type: "invited";
@@ -44,6 +45,7 @@ export class InvitationService {
     if (groupInvite) {
       const group = await this.groupDao.findById(groupInvite.groupId);
       const inviter = group ? await this.userDao.findById(group.createdBy) : null;
+      const user = this.userDao.findByEmail(groupInvite.email);
       return {
         type: "signup",
         groupId: groupInvite.groupId,
@@ -51,7 +53,8 @@ export class InvitationService {
         inviterName: inviter?.fullName ?? "Someone",
         fullName: groupInvite?.fullName ?? "",
         phone: groupInvite?.phone ?? null,
-        email: groupInvite.email
+        email: groupInvite.email,
+        user: user ?? null
       };
     }
     const groupMember = await this.groupMemberDao.findByInvitationToken(token);
