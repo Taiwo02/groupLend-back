@@ -543,25 +543,35 @@ export class AdminGroupsService {
         }
       : baseWhere;
 
-    const { rows, count } = await GroupMember.findAndCountAll({
-      where,
-      distinct: true,
-      col: "GroupMember.id",
-      include: [
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "fullName", "email", "kycStatus", "trustScore"]
-        }
-      ],
-      limit: opts.limit,
-      offset: opts.offset,
-      order: [
-        ["role", "ASC"],
-        ["createdAt", "ASC"]
-      ],
-      subQuery: false
-    });
+    const includeUser = {
+      model: User,
+      as: "user" as const,
+      attributes: ["id", "fullName", "email", "kycStatus", "trustScore"]
+    };
+
+    // Avoid findAndCountAll + distinct + subQuery:false: Sequelize can emit invalid SQL
+    // `count(DISTINCT("GroupMember->GroupMember"."id"))` (missing FROM for nested alias).
+    const [rows, count] = await Promise.all([
+      GroupMember.findAll({
+        where,
+        include: [includeUser],
+        limit: opts.limit,
+        offset: opts.offset,
+        order: [
+          ["role", "ASC"],
+          ["createdAt", "ASC"]
+        ],
+        subQuery: false
+      }),
+      term
+        ? GroupMember.count({
+            where,
+            include: [includeUser],
+            distinct: true,
+            col: "id"
+          })
+        : GroupMember.count({ where: baseWhere })
+    ]);
 
     const userIds = rows.map((r) => r.userId);
     const statements = await this.statementDao.findByUserIds(userIds);
