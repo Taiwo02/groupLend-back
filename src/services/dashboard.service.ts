@@ -100,6 +100,8 @@ export type NonAcceptedMembership = {
   userId: string | null;
   /** Set when the row comes from `group_invites` (email not registered yet). */
   inviteId?: string;
+  /** Only for `group_invites` rows: creator has already used the one-time poke (resend). */
+  poke?: boolean;
   fullName: string;
   email: string;
   status: "INVITED";
@@ -336,6 +338,7 @@ export class DashboardService {
       .map((inv) => ({
         userId: null,
         inviteId: inv.id,
+        poke: inv.poke,
         fullName: inv.fullName,
         email: inv.email,
         status: "INVITED" as const,

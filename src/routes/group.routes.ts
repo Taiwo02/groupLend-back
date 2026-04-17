@@ -26,6 +26,7 @@ export function createGroupRoutes(
   routes.post("/:groupId/direct-debit-mandate/:mandateId/confirm", (c) =>
     directDebitMandateController.confirmMandate(c)
   );
+  routes.post("/:id/invites/:inviteId/poke", (c) => groupController.pokeInvite(c));
   routes.post("/:id/invite", (c) => groupController.inviteMembers(c));
   routes.get("/:id", (c) => groupController.getGroup(c));
   routes.post("/:id/exit", (c) => groupController.requestExit(c));

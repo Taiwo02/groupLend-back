@@ -39,4 +39,7 @@ export const inviteMembersSchema = z.object({
   invites: z.array(inviteeSchema).min(1, "at least one invite is required")
 });
 
-// 14c8464d-01a7-4dd6-928f-2d1269f10af5
+export const pokeInviteParamsSchema = z.object({
+  id: z.uuid("group id must be a valid uuid"),
+  inviteId: z.uuid("invite id must be a valid uuid")
+});

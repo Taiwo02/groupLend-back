@@ -3916,6 +3916,52 @@
         }
       }
     },
+    "/groups/{id}/invites/{inviteId}/poke": {
+      "post": {
+        "tags": ["Users · Groups"],
+        "summary": "Poke pending email invite (creator only, once)",
+        "description": "Resends the group invitation email for a **pending** row in `group_invites` (invitee has not signed up yet). Only the group **creator** may call this. Each invite can only be poked **once** (`poke` on the row becomes true). Does not apply to registered users invited via `group_members` (use other flows).",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Group id"
+          },
+          {
+            "name": "inviteId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Pending `group_invites` row id (see dashboard `nonAcceptedMemberships[].inviteId`)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reminder email queued; invite row returned with `poke` true",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GroupInvite" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invite no longer pending, or reminder was already sent"
+          },
+          "403": {
+            "description": "Only the group creator can poke"
+          },
+          "404": {
+            "description": "Group or invite not found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/groups/{id}/exit": {
       "post": {
         "tags": [
@@ -5658,6 +5704,23 @@
           }
         }
       },
+      "GroupInvite": {
+        "type": "object",
+        "description": "Pending email invitation to join a group (invitee not registered yet). `poke` is false until the creator uses POST .../poke once.",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "groupId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "fullName": { "type": "string" },
+          "phone": { "type": "string", "nullable": true },
+          "invitedBy": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["pending", "accepted", "expired"] },
+          "invitationToken": { "type": "string", "nullable": true },
+          "poke": { "type": "boolean", "description": "True after the one-time resend was used" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
       "DebitLinkedAccount": {
         "type": "object",
         "description": "Bank account linked for group-year direct debit (accounts table)",
@@ -5884,7 +5947,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "userId": { "type": "string", "format": "uuid" },
+                "userId": { "type": "string", "format": "uuid", "nullable": true, "description": "Set when invitee has an account (group_members); null for email-only group_invites" },
+                "inviteId": { "type": "string", "format": "uuid", "description": "Present for pending email-only invites (group_invites id); use with POST /groups/{id}/invites/{inviteId}/poke" },
+                "poke": { "type": "boolean", "description": "Only on email-only invites: true if the creator already used the one-time poke" },
                 "fullName": { "type": "string" },
                 "email": { "type": "string" },
                 "status": { "type": "string", "enum": ["INVITED"] },

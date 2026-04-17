@@ -20,6 +20,8 @@ export class GroupInvite extends Model<
   declare phone: string | null;
   declare invitedBy: string;
   declare status: GroupInviteStatus;
+  /** True after the group creator used their one-time "poke" (resend reminder). */
+  declare poke: CreationOptional<boolean>;
   declare invitationToken: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
@@ -46,6 +48,11 @@ GroupInvite.init(
       type: DataTypes.STRING(20),
       allowNull: true,
       unique: true
+    },
+    poke: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

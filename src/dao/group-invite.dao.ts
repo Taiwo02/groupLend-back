@@ -27,6 +27,13 @@ export class GroupInviteDao {
     });
   }
 
+  findByIdAndGroup(inviteId: string, groupId: string, transaction?: Transaction): Promise<GroupInvite | null> {
+    return GroupInvite.findOne({
+      where: { id: inviteId, groupId },
+      transaction
+    });
+  }
+
   async findPendingByEmail(email: string, transaction?: Transaction): Promise<GroupInvite[]> {
     return GroupInvite.findAll({
       where: { email: email.toLowerCase(), status: "pending" },

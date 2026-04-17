@@ -249,6 +249,56 @@ export class GroupService {
     });
   }
 
+  /**
+   * Resend the group invitation email for a pending email invite (not yet registered).
+   * Only the group creator may call this, and only once per invite (`poke` tracks that).
+   */
+  async pokePendingInvite(groupId: string, inviteId: string, callerId: string): Promise<GroupInvite> {
+    const group = await this.groupDao.findById(groupId);
+    if (!group) throw new HttpError(404, "Group not found");
+    if (group.createdBy !== callerId) {
+      throw new HttpError(403, "Only the group creator can poke an invitation");
+    }
+
+    const [n] = await GroupInvite.update(
+      { poke: true },
+      { where: { id: inviteId, groupId, status: "pending", poke: false } }
+    );
+    if (n === 0) {
+      const inv = await this.groupInviteDao.findByIdAndGroup(inviteId, groupId);
+      if (!inv) throw new HttpError(404, "Invitation not found");
+      if (inv.poke) {
+        throw new HttpError(400, "Reminder was already sent for this invitation");
+      }
+      throw new HttpError(400, "Invitation is no longer pending");
+    }
+
+    const invite = await this.groupInviteDao.findByIdAndGroup(inviteId, groupId);
+    if (!invite) throw new HttpError(500, "Invitation not found after update");
+
+    let invitationToken = invite.invitationToken;
+    if (!invitationToken) {
+      invitationToken = this.generateInvitationToken();
+      await invite.update({ invitationToken });
+    }
+
+    const inviter = await this.userDao.findById(callerId);
+    const baseUrl = env.frontendUrl.replace(/\/$/, "") || "";
+    const acceptUrl = baseUrl ? `${baseUrl}/member-invitation/${invitationToken}` : "#";
+
+    this.emailService
+      .sendGroupInvite(invite.email, {
+        recipientName: invite.fullName,
+        groupName: group.name,
+        inviterName: inviter?.fullName,
+        acceptUrl,
+        baseUrl: env.frontendUrl
+      })
+      .catch(() => {});
+
+    return (await this.groupInviteDao.findByIdAndGroup(inviteId, groupId)) ?? invite;
+  }
+
   async joinGroup(groupId: string, userId: string): Promise<GroupMember> {
     return this.dbDao.withTransaction(async (transaction) => {
       const existingGroupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId, transaction);

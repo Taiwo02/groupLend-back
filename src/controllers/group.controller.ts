@@ -3,7 +3,8 @@ import { GroupService } from "../services/group.service.js";
 import {
   createGroupSchema,
   groupIdParamSchema,
-  inviteMembersSchema
+  inviteMembersSchema,
+  pokeInviteParamsSchema
 } from "../validators/group.validator.js";
 import { parseWithSchema, readJsonBody } from "../utils/request.js";
 
@@ -48,6 +49,15 @@ export class GroupController {
       c.get("userId")
     );
     return c.json(invited);
+  }
+
+  async pokeInvite(c: Context): Promise<Response> {
+    const params = parseWithSchema(pokeInviteParamsSchema, {
+      id: c.req.param("id"),
+      inviteId: c.req.param("inviteId")
+    });
+    const invite = await this.groupService.pokePendingInvite(params.id, params.inviteId, c.get("userId"));
+    return c.json(invite);
   }
 
   async getGroup(c: Context): Promise<Response> {
