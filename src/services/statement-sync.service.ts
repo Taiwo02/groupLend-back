@@ -89,13 +89,11 @@ export class StatementSyncService {
    * When code is not "skip", fetches identities, income, statement, details from Mono
    * and saves each to the user's statement record.
    */
-  async saveStatementInfo(userId: string, code: string): Promise<void> {
+  async saveStatementInfo(userId: string, code: string, accountId: string): Promise<void> {
     if (code === "skip") return;
-    const monoAccountId = await getAccounId(code);
-    if (!monoAccountId) return;
-    await this.saveIdentities(monoAccountId, userId);
-    await this.saveIncome(monoAccountId, userId);
-    await this.saveStatement(monoAccountId, userId);
-    await this.saveDetails(monoAccountId, userId);
+    await this.saveIdentities(accountId, userId);
+    await this.saveIncome(accountId, userId);
+    await this.saveStatement(accountId, userId);
+    await this.saveDetails(accountId, userId);
   }
 }

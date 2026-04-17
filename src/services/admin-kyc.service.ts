@@ -12,7 +12,8 @@ import {
   lookupNin,
   verifyAddress as monoVerifyAddress,
   getCreditHistoryByBvn,
-  getStatement as monoGetStatement
+  getStatement as monoGetStatement,
+  getAccounId
 } from "./mono.client.js";
 
 /** Format kycId for display (e.g. KYC-77210). */
@@ -450,12 +451,13 @@ export class AdminKycService {
       return { statement: existing!.statement as Record<string, unknown>, fromCache: true };
     }
     
-    const accountId = existing?.accountId ?? (existing?.extraData as Record<string, unknown> | undefined)?.accountId as string | undefined;
+    // const accountId = existing?.accountId ?? (existing?.extraData as Record<string, unknown> | undefined)?.accountId as string | undefined;
+    // if (!accountId) throw new HttpError(400, "No linked account to fetch statement");
+    const accountId = await getAccounId(existing?.code ?? "");
     if (!accountId) throw new HttpError(400, "No linked account to fetch statement");
     const result = await monoGetStatement(accountId);
-    
     if (!result.ok || result.data == null) throw new HttpError(502, result.message ?? "Failed to fetch statement");
-    await this.statementDao.createOrUpdate(record.userId, { statement: result.data });
+    await this.statementDao.createOrUpdate(record.userId, { statement: result.data, accountId: accountId });
     return { statement: result.data, fromCache: false };
   }
 

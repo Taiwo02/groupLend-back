@@ -11,6 +11,7 @@ import { encryptBvn, ninLookupKey } from "../utils/encryption.js";
 import type { NinLookupData } from "../types/nin.js";
 import type { StatementSyncService } from "./statement-sync.service.js";
 import type { CreditService } from "./credit.service.js";
+import { getAccounId } from "./mono.client.js";
 
 /** KYC steps: 0 = nin + fullName + address + meter fields, 1 = account + BVN + code, 2 = employment. Step 3 = submitted. */
 export const KYC_MAX_STEP = 3;
@@ -181,13 +182,17 @@ export class KycService {
         bvnEncrypted,
         ninLookupKey: lookupKey
       });
+        const accountId = await getAccounId(payload.code);
+        if (!accountId) {
+          throw new HttpError(400, "Account not found");
+        }
       await this.statementDao.createOrUpdate(userId, {
         code: payload.code,
-        accountId: payload.account.accountNumber,
+        accountId: accountId,
         extraData: { account: payload.account },
         status: true
       });
-      await this.statementSyncService.saveStatementInfo(userId, payload.code);
+      await this.statementSyncService.saveStatementInfo(userId, payload.code, accountId);
     } else if (payload.step === 2) {
       await sequelize.transaction(async (transaction) => {
         const u = await User.findByPk(userId, {
