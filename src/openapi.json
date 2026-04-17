@@ -568,6 +568,15 @@
                     "email": {
                       "type": "string",
                       "description": "Only for type signup"
+                    },
+                    "fullName": {
+                      "type": "string",
+                      "description": "Only for type signup: name from the invite"
+                    },
+                    "phone": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Only for type signup: phone from the invite if any"
                     }
                   }
                 }

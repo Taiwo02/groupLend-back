@@ -11,14 +11,22 @@ import { HttpError } from "../utils/http-error.js";
 import { hashValue, signJwt } from "../utils/auth.js";
 import type { SignupInput } from "./auth.service.js";
 
-export type InvitationInfo = {
-  type: "signup" | "invited";
-  groupId: string;
-  groupName: string;
-  inviterName: string;
-  /** Only for type signup: pre-filled email from invite */
-  email?: string;
-};
+export type InvitationInfo =
+  | {
+      type: "signup";
+      groupId: string;
+      groupName: string;
+      inviterName: string;
+      email: string;
+      fullName: string;
+      phone: string | null;
+    }
+  | {
+      type: "invited";
+      groupId: string;
+      groupName: string;
+      inviterName: string;
+    };
 
 export class InvitationService {
   constructor(
@@ -41,6 +49,8 @@ export class InvitationService {
         groupId: groupInvite.groupId,
         groupName: group?.name ?? "",
         inviterName: inviter?.fullName ?? "Someone",
+        fullName: groupInvite?.fullName ?? "",
+        phone: groupInvite?.phone ?? null,
         email: groupInvite.email
       };
     }
