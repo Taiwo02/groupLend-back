@@ -20,7 +20,6 @@ export class InvitationController {
     const body = await readJsonBody<Record<string, unknown>>(c);
     const payload = parseWithSchema(acceptInvitationSchema, body) as z.infer<typeof acceptInvitationSchema>;
     const userId = c.get("userId") as string | undefined;
-    console.log("Token::", token);
     const result = await this.invitationService.accept(token, {
       userId,
       signup: payload.signup
