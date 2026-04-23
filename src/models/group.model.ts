@@ -115,12 +115,12 @@ Group.init(
       defaultValue: InterestType.FLAT
     },
     interest: {
-      type: DataTypes.DECIMAL(8, 4),
+      type: DataTypes.DECIMAL(8, 2),
       allowNull: true,
       defaultValue:5
     },
     penalCharges: {
-      type: DataTypes.DECIMAL(8, 4),
+      type: DataTypes.DECIMAL(8, 2),
       allowNull: true
     },
     gracePeriod: {
@@ -134,7 +134,7 @@ Group.init(
       defaultValue: RepaymentType.MONTHLY
     },
     overGracePenalCharges: {
-      type: DataTypes.DECIMAL(8, 4),
+      type: DataTypes.DECIMAL(8, 2),
       allowNull: true,
       defaultValue: 10
     },

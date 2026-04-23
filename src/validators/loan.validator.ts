@@ -1,4 +1,5 @@
 import { z } from "../utils/request.js";
+import { LoanStatus } from "../models/enums.js";
 
 export const loanIdParamSchema = z.object({
   id: z.uuid("loan id must be a valid uuid")
@@ -36,19 +37,7 @@ export const groupLoanListQuerySchema = z.object({
     .refine(
       (values) =>
         values == null ||
-        values.every((v) =>
-          [
-            "REQUESTED",
-            "PENDING_APPROVAL",
-            "INSTITUTIONAL_PENDING",
-            "APPROVED",
-            "REJECTED",
-            "DISBURSED",
-            "ACTIVE",
-            "REPAID",
-            "DEFAULTED"
-          ].includes(v)
-        ),
+        values.every((v) => (Object.values(LoanStatus) as string[]).includes(v)),
       "status must be a comma-separated list of valid loan statuses"
     )
 });

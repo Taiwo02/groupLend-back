@@ -54,7 +54,7 @@ Loan.init(
       allowNull: false
     },
     interestRate: {
-      type: DataTypes.DECIMAL(6, 4),
+      type: DataTypes.DECIMAL(6, 2),
       allowNull: false
     },
     tenorMonths: {
