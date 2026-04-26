@@ -47,6 +47,12 @@ const ACCESS_INCOME_RATIO = 0.4;
 const MONTHS_PER_YEAR = 12;
 /** Group mandate spans 12 months; `maximumAmount` is the six-month access cap. */
 const SEMESTERS_PER_MANDATE_YEAR = 2;
+const OUTSTANDING_BALANCE_VISIBLE_STATUSES = new Set<LoanStatus>([
+  LoanStatus.DISBURSED,
+  LoanStatus.ACTIVE,
+  LoanStatus.REPAID,
+  LoanStatus.DEFAULTED
+]);
 
 export class LoanService {
   constructor(
@@ -218,8 +224,9 @@ export class LoanService {
       );
 
       if (initialStatus === LoanStatus.PENDING_APPROVAL) {
+        const approverMembers = activeMembers.filter((member) => member.userId !== input.borrowerId);
         await this.loanApprovalDao.createPendingApprovals(
-          activeMembers.map((member) => ({
+          approverMembers.map((member) => ({
             loanId: loan.id,
             approverId: member.userId,
             decision: ApprovalDecision.PENDING
@@ -228,22 +235,20 @@ export class LoanService {
         );
         const borrower = await this.userDao.findById(input.borrowerId, transaction);
         const borrowerName = borrower?.fullName ?? "A member";
-        for (const member of activeMembers) {
-          if (member.userId !== input.borrowerId) {
-            this.notificationService
-              .notifyLoanRequest(member.userId, input.amount, borrowerName)
+        for (const member of approverMembers) {
+          this.notificationService
+            .notifyLoanRequest(member.userId, input.amount, borrowerName)
+            .catch(() => {});
+          const approver = await this.userDao.findById(member.userId, transaction);
+          if (approver?.email) {
+            this.emailService
+              .sendLoanRequest(approver.email, {
+                approverName: approver.fullName,
+                borrowerName,
+                amount: input.amount,
+                currency: "NGN"
+              })
               .catch(() => {});
-            const approver = await this.userDao.findById(member.userId, transaction);
-            if (approver?.email) {
-              this.emailService
-                .sendLoanRequest(approver.email, {
-                  approverName: approver.fullName,
-                  borrowerName,
-                  amount: input.amount,
-                  currency: "NGN"
-                })
-                .catch(() => {});
-            }
           }
         }
       }
@@ -401,9 +406,10 @@ export class LoanService {
         loan.groupId,
         transaction
       );
+      const approverMembers = activeMembers.filter((member) => member.userId !== loan.borrowerId);
       await loan.update({ status: LoanStatus.PENDING_APPROVAL }, { transaction });
       await this.loanApprovalDao.createPendingApprovals(
-        activeMembers.map((member) => ({
+        approverMembers.map((member) => ({
           loanId: loan.id,
           approverId: member.userId,
           decision: ApprovalDecision.PENDING
@@ -474,6 +480,10 @@ export class LoanService {
   async getLoanById(id: string, userId: string): Promise<Loan> {
     const loan = await this.loanDao.getLoanWithRelations(id);
     if (!loan) throw new HttpError(404, "Loan not found");
+
+    if (!OUTSTANDING_BALANCE_VISIBLE_STATUSES.has(loan.status)) {
+      loan.setDataValue("outstandingBalance", 0);
+    }
 
     const isBorrower = loan.borrowerId === userId;
     if (isBorrower) return loan;
