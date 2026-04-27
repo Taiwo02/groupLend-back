@@ -534,7 +534,7 @@ export class DashboardService {
     const bankStatement = getBankStatementStatus(statement);
     const directDebitSetup =
       ddMandate?.status === MandateStatus.ACTIVE ||
-      ddMandate?.status === MandateStatus.INPROGRESS;
+      ddMandate?.status === MandateStatus.APPROVED;
     const ACCESS_INCOME_RATIO = 0.4;
     const MONTHS_PER_YEAR = 12;
     const monthly = toNumber(user.monthlyIncome ?? 0);

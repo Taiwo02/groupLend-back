@@ -44,6 +44,9 @@ export function createLoanRoutes(
   routes.post("/direct-debit-mandate/:mandateId/confirm", (c) =>
     directDebitMandateController.confirmMandateIndividual(c)
   );
+  routes.post("/direct-debit-mandate/:mandateId/done", (c) =>
+    directDebitMandateController.confirmMandateDoneIndividual(c)
+  );
 
   // Loan approval / rejection
   routes.post("/:id/approve", requireOnboardingComplete, (c) =>

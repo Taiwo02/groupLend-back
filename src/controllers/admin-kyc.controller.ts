@@ -3,6 +3,10 @@ import { AdminKycService } from "../services/admin-kyc.service.js";
 import { KycStatus } from "../models/enums.js";
 import { parseWithSchema } from "../utils/request.js";
 import { groupIdParamSchema } from "../validators/group.validator.js";
+import {
+  adminMandateListQuerySchema,
+  adminMandateReviewBodySchema
+} from "../validators/admin-mandate.validator.js";
 
 const VALID_USER_KYC_STATUSES = new Set<string>(Object.values(KycStatus));
 
@@ -91,6 +95,40 @@ export class AdminKycController {
   async verifyNin(c: Context): Promise<Response> {
     const kycId = c.req.param("kycId");
     const data = await this.adminKycService.verifyNin(kycId);
+    return c.json(data);
+  }
+
+  async getUnfinishedMandates(c: Context): Promise<Response> {
+    const query = parseWithSchema(adminMandateListQuerySchema, {
+      type: c.req.query("type"),
+      search: c.req.query("search"),
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset")
+    });
+    const data = await this.adminKycService.getUnfinishedMandates(query);
+    return c.json(data);
+  }
+
+  async getCompletedMandates(c: Context): Promise<Response> {
+    const query = parseWithSchema(adminMandateListQuerySchema, {
+      type: c.req.query("type"),
+      search: c.req.query("search"),
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset")
+    });
+    const data = await this.adminKycService.getCompletedMandates(query);
+    return c.json(data);
+  }
+
+  async reviewCompletedMandate(c: Context): Promise<Response> {
+    const mandateId = c.req.param("mandateId");
+    const body = await c.req.json().catch(() => ({}));
+    const payload = parseWithSchema(adminMandateReviewBodySchema, body);
+    const data = await this.adminKycService.reviewCompletedMandate(
+      mandateId,
+      payload.action,
+      payload.comment
+    );
     return c.json(data);
   }
 }

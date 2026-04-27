@@ -51,6 +51,9 @@ export function createAdminRoutes(
   routes.post("/kyc/:kycId/verify/credit-history", (c) => adminKycController.verifyCreditHistory(c));
   routes.get("/kyc/:kycId/statement", (c) => adminKycController.fetchStatement(c));
   routes.post("/kyc/:kycId/verify/nin", (c) => adminKycController.verifyNin(c));
+  routes.get("/kyc/mandates/unfinished", (c) => adminKycController.getUnfinishedMandates(c));
+  routes.get("/kyc/mandates/completed", (c) => adminKycController.getCompletedMandates(c));
+  routes.post("/kyc/mandates/:mandateId/review", (c) => adminKycController.reviewCompletedMandate(c));
 
   return routes;
 }

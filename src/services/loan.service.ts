@@ -449,13 +449,13 @@ export class LoanService {
       );
       const nonCompliant: string[] = [];
       const debitOk = (s: MandateStatus | undefined) =>
-        s === MandateStatus.ACTIVE || s === MandateStatus.INPROGRESS;
+        s === MandateStatus.ACTIVE || s === MandateStatus.APPROVED;
       for (const uid of userIds) {
         const status = mandateStatusByUser.get(uid);
         if (!debitOk(status)) nonCompliant.push(uid);
       }
       if (nonCompliant.length > 0) {
-        throw new HttpError(400, "All members must have an active or in-progress direct debit mandate before disbursement", {
+        throw new HttpError(400, "All members must have an active or admin-approved direct debit mandate before disbursement", {
           nonCompliantMemberIds: nonCompliant
         });
       }

@@ -77,6 +77,26 @@ export class DirectDebitMandateController {
     });
   }
 
+  /** POST /groups/:groupId/direct-debit-mandate/:mandateId/done - customer marks setup complete for admin review. */
+  async confirmMandateDone(c: Context): Promise<Response> {
+    const groupId = parseWithSchema(groupIdParamSchema, { groupId: c.req.param("groupId") }).groupId;
+    const mandateId = parseWithSchema(mandateIdParamSchema, { mandateId: c.req.param("mandateId") }).mandateId;
+    const userId = c.get("userId");
+    const mandate = await this.directDebitMandateService.confirmMandateDone(
+      mandateId,
+      userId,
+      groupId
+    );
+    return c.json({
+      mandate: {
+        id: mandate.id,
+        groupId: mandate.groupId,
+        status: mandate.status,
+        createdAt: mandate.createdAt.toISOString()
+      }
+    });
+  }
+
   /** POST .../accounts/:accountId — get or refresh Mono payment mandate (3h cache on reference). */
   async getOrRefreshAccountMandate(c: Context): Promise<Response> {
     const groupId = parseWithSchema(groupIdParamSchema, { groupId: c.req.param("groupId") }).groupId;
@@ -148,6 +168,27 @@ export class DirectDebitMandateController {
         createdAt: mandate.createdAt.toISOString()
       },
       accounts: accounts.map((a) => DirectDebitMandateService.serializeDebitAccount(a))
+    });
+  }
+
+  /** POST /loans/direct-debit-mandate/:mandateId/done */
+  async confirmMandateDoneIndividual(c: Context): Promise<Response> {
+    const mandateId = parseWithSchema(mandateIdParamSchema, {
+      mandateId: c.req.param("mandateId")
+    }).mandateId;
+    const userId = c.get("userId");
+    const mandate = await this.directDebitMandateService.confirmMandateDone(
+      mandateId,
+      userId,
+      null
+    );
+    return c.json({
+      mandate: {
+        id: mandate.id,
+        groupId: null,
+        status: mandate.status,
+        createdAt: mandate.createdAt.toISOString()
+      }
     });
   }
 

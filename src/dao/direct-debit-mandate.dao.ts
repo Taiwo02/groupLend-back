@@ -40,8 +40,8 @@ export class DirectDebitMandateDao {
   }
 
   /**
-   * Group IDs where the user has an ACTIVE direct-debit mandate created within the last 12 months
-   * (same validity window as loan approval).
+   * Group IDs where the user has an ACTIVE/APPROVED direct-debit mandate created
+   * within the last 12 months (same validity window as loan approval).
    */
   async findRunningMandateGroupIdsForUser(
     userId: string,
@@ -53,7 +53,7 @@ export class DirectDebitMandateDao {
       where: {
         userId,
         groupId: { [Op.in]: groupIds },
-        status: MandateStatus.ACTIVE
+        status: { [Op.in]: [MandateStatus.ACTIVE, MandateStatus.APPROVED] }
       },
       attributes: ["groupId", "createdAt"],
       transaction
@@ -91,7 +91,7 @@ export class DirectDebitMandateDao {
 
   async countActiveByGroup(groupId: string, userIds: string[], transaction?: Transaction): Promise<number> {
     const count = await DirectDebitMandate.count({
-      where: { groupId, userId: userIds, status: MandateStatus.ACTIVE },
+      where: { groupId, userId: userIds, status: { [Op.in]: [MandateStatus.ACTIVE, MandateStatus.APPROVED] } },
       transaction
     });
     return count;

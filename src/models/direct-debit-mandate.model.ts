@@ -19,6 +19,7 @@ export class DirectDebitMandate extends Model<
   declare monoSessionId: string | null;
   declare monoCustomerId: string | null;
   declare lastResendAt: Date | null;
+  declare adminReviewComment: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -57,6 +58,11 @@ DirectDebitMandate.init(
       type: DataTypes.DATE,
       allowNull: true,
       field: "last_resend_at"
+    },
+    adminReviewComment: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "admin_review_comment"
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE

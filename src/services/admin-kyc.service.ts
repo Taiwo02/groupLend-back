@@ -4,8 +4,8 @@ import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
 import { Op } from "sequelize";
-import { Group, GroupMember, KycVerification, User, UserKycData } from "../models/index.js";
-import { GroupMemberStatus, KycStatus } from "../models/enums.js";
+import { DirectDebitMandate, Group, GroupMember, KycVerification, User, UserKycData } from "../models/index.js";
+import { GroupMemberStatus, KycStatus, MandateStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { decryptBvn } from "../utils/encryption.js";
 import {
@@ -138,6 +138,29 @@ export type AdminKycDetailsResult = {
   verification: AdminKycDetailsVerification | null;
 };
 
+export type AdminMandateItem = {
+  mandateId: string;
+  mandateType: "Individual" | "Group";
+  status: MandateStatus;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    fullName: string;
+    email: string;
+  };
+  group: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+export type AdminMandateListResult = {
+  count: number;
+  items: AdminMandateItem[];
+};
+
 export class AdminKycService {
   constructor(
     private readonly userDao: UserDao,
@@ -146,6 +169,63 @@ export class AdminKycService {
     private readonly statementDao: StatementDao,
     private readonly groupMemberDao: GroupMemberDao
   ) {}
+
+  async getUnfinishedMandates(opts: {
+    type?: "individual" | "group";
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AdminMandateListResult> {
+    return this.getMandatesByStatuses(
+      [
+        MandateStatus.INACTIVE,
+        MandateStatus.INPROGRESS,
+        MandateStatus.FAILED,
+        MandateStatus.CANCELED
+      ],
+      opts
+    );
+  }
+
+  async getCompletedMandates(opts: {
+    type?: "individual" | "group";
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AdminMandateListResult> {
+    return this.getMandatesByStatuses([MandateStatus.COMPLETED], opts);
+  }
+
+  async reviewCompletedMandate(
+    mandateId: string,
+    action: "approve" | "revert",
+    comment?: string
+  ): Promise<{ message: string }> {
+    const mandate = await DirectDebitMandate.findByPk(mandateId);
+    if (!mandate) throw new HttpError(404, "Mandate not found");
+    if (mandate.status !== MandateStatus.COMPLETED) {
+      throw new HttpError(400, "Only COMPLETED mandates can be reviewed");
+    }
+
+    if (action === "approve") {
+      await mandate.update({
+        status: MandateStatus.APPROVED,
+        adminReviewComment: null
+      });
+      return { message: "Mandate approved successfully" };
+    }
+
+    const reviewComment = comment?.trim();
+    if (!reviewComment) {
+      throw new HttpError(400, "comment is required when action is revert");
+    }
+
+    await mandate.update({
+      status: MandateStatus.INACTIVE,
+      adminReviewComment: reviewComment
+    });
+    return { message: "Mandate reverted successfully" };
+  }
 
   /** Count KYC records. Optional users.kycStatus filter and search. No filter = all records. */
   async getKycCount(userKycStatus?: KycStatus, search?: string): Promise<AdminKycCountResult> {
@@ -473,5 +553,76 @@ export class AdminKycService {
       ninApproved: result.ok
     });
     return { ok: result.ok, message: result.message };
+  }
+
+  private async getMandatesByStatuses(
+    statuses: MandateStatus[],
+    opts: {
+      type?: "individual" | "group";
+      search?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<AdminMandateListResult> {
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
+    const offset = Math.max(0, opts.offset ?? 0);
+    const where: Record<string | symbol, unknown> = {
+      status: { [Op.in]: statuses }
+    };
+
+    if (opts.type === "group") {
+      where.groupId = { [Op.ne]: null };
+    } else if (opts.type === "individual") {
+      where.groupId = { [Op.is]: null };
+    }
+
+    const search = opts.search?.trim();
+    if (search) {
+      where[Op.or] = [
+        { "$user.fullName$": { [Op.iLike]: `%${search}%` } },
+        { "$user.email$": { [Op.iLike]: `%${search}%` } },
+        { "$group.name$": { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const { rows, count } = await DirectDebitMandate.findAndCountAll({
+      where,
+      include: [
+        { association: "user", attributes: ["id", "fullName", "email"], required: true },
+        { association: "group", attributes: ["id", "name"], required: false }
+      ],
+      order: [["createdAt", "DESC"]],
+      limit,
+      offset,
+      distinct: true
+    });
+
+    const items: AdminMandateItem[] = rows.map((row) => {
+      const mandate = row as DirectDebitMandate & {
+        user?: Pick<User, "id" | "fullName" | "email">;
+        group?: Pick<Group, "id" | "name"> | null;
+      };
+      return {
+        mandateId: mandate.id,
+        mandateType: mandate.groupId ? "Group" : "Individual",
+        status: mandate.status,
+        comment: mandate.adminReviewComment ?? null,
+        createdAt: mandate.createdAt.toISOString(),
+        updatedAt: mandate.updatedAt.toISOString(),
+        user: {
+          id: mandate.user?.id ?? mandate.userId,
+          fullName: mandate.user?.fullName ?? "Unknown",
+          email: mandate.user?.email ?? ""
+        },
+        group: mandate.group
+          ? {
+              id: mandate.group.id,
+              name: mandate.group.name
+            }
+          : null
+      };
+    });
+
+    return { count, items };
   }
 }

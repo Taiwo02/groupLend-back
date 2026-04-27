@@ -51,7 +51,8 @@ export class ApprovalService {
         );
         const debitOk =
           directMandate &&
-          (directMandate.status === MandateStatus.ACTIVE || directMandate.status === MandateStatus.INPROGRESS) &&
+          (directMandate.status === MandateStatus.ACTIVE ||
+            directMandate.status === MandateStatus.APPROVED) &&
           this.isMandateWithinYear(directMandate.createdAt ?? new Date(0));
         if (!debitOk) {
           throw new HttpError(

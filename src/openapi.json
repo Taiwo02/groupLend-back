@@ -3126,6 +3126,163 @@
         }
       }
     },
+    "/admin/kyc/mandates/unfinished": {
+      "get": {
+        "operationId": "adminListUnfinishedMandates",
+        "tags": ["Admin · KYC"],
+        "summary": "List unfinished direct debit mandates",
+        "description": "Returns direct debit mandates still in setup/rework states (INACTIVE, INPROGRESS, FAILED, CANCELED). Supports filtering by mandate type and search by user/group.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["individual", "group"] }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AdminMandateListItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/kyc/mandates/completed": {
+      "get": {
+        "operationId": "adminListCompletedMandates",
+        "tags": ["Admin · KYC"],
+        "summary": "List completed direct debit mandates",
+        "description": "Returns direct debit mandates with COMPLETED status waiting for admin review and approval/revert action.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["individual", "group"] }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AdminMandateListItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/kyc/mandates/{mandateId}/review": {
+      "post": {
+        "operationId": "adminReviewCompletedMandate",
+        "tags": ["Admin · KYC"],
+        "summary": "Approve or revert a completed mandate",
+        "description": "Admin review action for COMPLETED mandates. `approve` moves status to APPROVED. `revert` moves status to INACTIVE and requires comment.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "mandateId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["action"],
+                "properties": {
+                  "action": { "type": "string", "enum": ["approve", "revert"] },
+                  "comment": { "type": "string", "description": "Required when action is revert." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Review applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid action payload or mandate not COMPLETED" },
+          "404": { "description": "Mandate not found" }
+        }
+      }
+    },
     "/admin/kyc/groups/{groupId}/members": {
       "get": {
         "operationId": "adminListGroupMembersKyc",
@@ -4108,8 +4265,12 @@
                               "type": "string",
                               "enum": [
                                 "ACTIVE",
+                                "APPROVED",
                                 "INACTIVE",
-                                "FAILED"
+                                "FAILED",
+                                "INPROGRESS",
+                                "COMPLETED",
+                                "CANCELED"
                               ]
                             },
                             "createdAt": {
@@ -4233,7 +4394,7 @@
           "Users · Groups"
         ],
         "summary": "List saved direct-debit accounts for this group",
-        "description": "Returns bank accounts linked for the current user under the group's current lending mandate period (same shape as confirm response accounts), ordered by createdAt descending. Empty array unless the user's latest direct-debit mandate for this group is INPROGRESS or ACTIVE (BVN/accounts flow completed). Also empty if there is no current group mandate period, no member mandate, or no accounts saved. Requires active group membership.",
+        "description": "Returns bank accounts linked for the current user under the group's current lending mandate period (same shape as confirm response accounts), ordered by createdAt descending. Empty array unless the user's latest direct-debit mandate for this group is INPROGRESS, COMPLETED, APPROVED, or ACTIVE (BVN/accounts flow completed). Also empty if there is no current group mandate period, no member mandate, or no accounts saved. Requires active group membership.",
         "security": [
           {
             "bearerAuth": []
@@ -4282,7 +4443,7 @@
           "Users · Groups"
         ],
         "summary": "Confirm mandate with OTP and link accounts",
-        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate ACTIVE. Response includes all successfully saved linked accounts (use account ids for refresh/verify). mandateId comes from POST /groups/{groupId}/direct-debit-mandate response. Mandate debit cap is derived server-side from the group (max of currentCreditPool and targetCredit; default 1,000,000 NGN if both are zero). Body: otp only.",
+        "description": "Verify OTP with Mono, fetch BVN-linked bank accounts, create a Mono payment mandate per account and save Account records, then set the direct debit mandate INPROGRESS. After account mandate verification, call `.../done` to mark the setup COMPLETED for admin review. Response includes all successfully saved linked accounts (use account ids for refresh/verify). mandateId comes from POST /groups/{groupId}/direct-debit-mandate response. Mandate debit cap is derived server-side from the group (max of currentCreditPool and targetCredit; default 1,000,000 NGN if both are zero). Body: otp only.",
         "security": [
           {
             "bearerAuth": []
@@ -4377,6 +4538,47 @@
           "404": {
             "description": "Mandate not found"
           }
+        }
+      }
+    },
+    "/groups/{groupId}/direct-debit-mandate/{mandateId}/done": {
+      "post": {
+        "operationId": "confirmDirectDebitMandateDone",
+        "tags": ["Users · Groups"],
+        "summary": "Mark group mandate setup as done",
+        "description": "Customer confirms setup completion after account linking/verification. Moves direct debit mandate from INPROGRESS to COMPLETED for admin review.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "mandateId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandate marked completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": { "$ref": "#/components/schemas/DirectDebitMandateResult" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Mandate not in progress or wrong flow" },
+          "403": { "description": "Not your mandate" },
+          "404": { "description": "Mandate not found" }
         }
       }
     },
@@ -4674,7 +4876,7 @@
           "Users · Loans"
         ],
         "summary": "Request group loan",
-        "description": "Create a group loan; all active group members must approve. Each approver must have an active direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
+        "description": "Create a group loan; all active group members must approve. Each approver must have an active or admin-approved direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -4868,7 +5070,7 @@
         "operationId": "listIndividualDirectDebitAccounts",
         "tags": ["Users · Loans"],
         "summary": "List saved individual direct-debit accounts",
-        "description": "Returns the bank accounts linked for the current user under their active individual mandate period, ordered by createdAt descending. Empty array if no mandate exists or the mandate has not reached INPROGRESS/ACTIVE state yet.",
+        "description": "Returns the bank accounts linked for the current user under their active individual mandate period, ordered by createdAt descending. Empty array if no mandate exists or the mandate has not reached INPROGRESS, COMPLETED, APPROVED, or ACTIVE state yet.",
         "security": [{ "bearerAuth": [] }],
         "responses": {
           "200": {
@@ -4940,6 +5142,41 @@
           "400": {
             "description": "Invalid OTP, mandate not INACTIVE, no session ID, BVN/KYC missing, no accounts returned, or this is a group mandate"
           },
+          "403": { "description": "Not your mandate" },
+          "404": { "description": "Mandate not found" }
+        }
+      }
+    },
+    "/loans/direct-debit-mandate/{mandateId}/done": {
+      "post": {
+        "operationId": "confirmIndividualDirectDebitMandateDone",
+        "tags": ["Users · Loans"],
+        "summary": "Mark individual mandate setup as done",
+        "description": "Customer confirms individual mandate setup completion. Moves direct debit mandate from INPROGRESS to COMPLETED for admin review.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "mandateId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandate marked completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mandate": { "$ref": "#/components/schemas/DirectDebitMandateResult" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Mandate not in progress or wrong flow" },
           "403": { "description": "Not your mandate" },
           "404": { "description": "Mandate not found" }
         }
@@ -5068,7 +5305,7 @@
           "Users · Loans"
         ],
         "summary": "Approve a group loan",
-        "description": "Record the caller's approval for a group loan. Only active group members can approve. For group loans, the approver must have an active direct debit mandate for the group (created and authorized within the last 12 months). If the approver has no running mandate, they must create and authorize direct debit on their account(s) before they can approve. Requires onboarding complete and request body with loanPin (4 digits). When all members have approved, the loan moves to APPROVED and is disbursed.",
+        "description": "Record the caller's approval for a group loan. Only active group members can approve. For group loans, the approver must have an active or admin-approved direct debit mandate for the group (created and authorized within the last 12 months). If the approver has no running mandate, they must create and authorize direct debit on their account(s) before they can approve. Requires onboarding complete and request body with loanPin (4 digits). When all members have approved, the loan moves to APPROVED and is disbursed.",
         "security": [
           {
             "bearerAuth": []
@@ -5428,6 +5665,38 @@
           }
         }
       },
+      "AdminMandateListItem": {
+        "type": "object",
+        "required": ["mandateId", "mandateType", "status", "createdAt", "updatedAt", "user", "group"],
+        "properties": {
+          "mandateId": { "type": "string", "format": "uuid" },
+          "mandateType": { "type": "string", "enum": ["Individual", "Group"] },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "APPROVED", "INACTIVE", "FAILED", "INPROGRESS", "COMPLETED", "CANCELED"]
+          },
+          "comment": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "user": {
+            "type": "object",
+            "required": ["id", "fullName", "email"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "fullName": { "type": "string" },
+              "email": { "type": "string" }
+            }
+          },
+          "group": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      },
       "AdminKycApproveResponse": {
         "type": "object",
         "required": ["message"],
@@ -5523,7 +5792,7 @@
           },
           "individualDirectDebitActive": {
             "type": "boolean",
-            "description": "Only present on GET /auth/profile when userType is 'individual'. True if the user's individual DirectDebitMandate is ACTIVE or INPROGRESS."
+            "description": "Only present on GET /auth/profile when userType is 'individual'. True if the user's individual DirectDebitMandate is ACTIVE or APPROVED."
           }
         }
       },
@@ -5790,7 +6059,7 @@
           "groupId": { "type": "string", "format": "uuid", "nullable": true, "description": "Null for individual mandates." },
           "status": {
             "type": "string",
-            "enum": ["ACTIVE", "INACTIVE", "FAILED", "INPROGRESS", "COMPLETED", "CANCELED"]
+            "enum": ["ACTIVE", "APPROVED", "INACTIVE", "FAILED", "INPROGRESS", "COMPLETED", "CANCELED"]
           },
           "createdAt": { "type": "string", "format": "date-time" }
         }
@@ -5830,7 +6099,7 @@
           "revenueEntered": { "type": "string", "enum": ["verified", "pending"] },
           "kycComplete": { "type": "string", "enum": ["done", "processing", "pending"] },
           "bankStatement": { "type": "string", "enum": ["uploaded", "awaiting"] },
-          "directDebitSetup": { "type": "boolean", "description": "True if the user's individual DirectDebitMandate is ACTIVE or INPROGRESS." },
+          "directDebitSetup": { "type": "boolean", "description": "True if the user's individual DirectDebitMandate is ACTIVE or APPROVED." },
           "accessAmount": { "type": "number", "description": "Calculated individual access amount: 40% × 12 × monthlyIncome." }
         }
       },

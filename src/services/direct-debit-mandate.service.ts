@@ -32,7 +32,12 @@ const ACCOUNT_MANDATE_REFRESH_HOURS = 3;
 
 /** Direct-debit mandate states where BVN-linked accounts have been persisted (list endpoint). */
 export function directDebitMandateAllowsListingAccounts(status: MandateStatus): boolean {
-  return status === MandateStatus.INPROGRESS || status === MandateStatus.ACTIVE;
+  return (
+    status === MandateStatus.INPROGRESS ||
+    status === MandateStatus.COMPLETED ||
+    status === MandateStatus.APPROVED ||
+    status === MandateStatus.ACTIVE
+  );
 }
 
 export type GetMandateResult = {
@@ -116,7 +121,10 @@ export class DirectDebitMandateService {
     }
     const existing = await this.directDebitMandateDao.findByUserAndGroup(userId, groupId, transaction);
     if (existing) {
-      if (existing.status === MandateStatus.ACTIVE) {
+      if (
+        existing.status === MandateStatus.ACTIVE ||
+        existing.status === MandateStatus.APPROVED
+      ) {
         const withinYear = this.isWithinYear(existing.createdAt);
         if (withinYear) throw new HttpError(400, "You already have an active direct debit mandate for this group");
       }
@@ -536,6 +544,30 @@ export class DirectDebitMandateService {
     return updated!;
   }
 
+  /** Customer confirms setup is done: INPROGRESS -> COMPLETED (awaiting admin approval). */
+  async confirmMandateDone(
+    mandateId: string,
+    userId: string,
+    expectedGroupId: string | null,
+    transaction?: Transaction
+  ): Promise<DirectDebitMandate> {
+    const mandate = await this.directDebitMandateDao.findById(mandateId, transaction);
+    if (!mandate) throw new HttpError(404, "Mandate not found");
+    if (mandate.userId !== userId) throw new HttpError(403, "Not your mandate");
+    if ((mandate.groupId ?? null) !== expectedGroupId) {
+      throw new HttpError(400, "Mandate does not belong to this flow");
+    }
+    if (mandate.status !== MandateStatus.INPROGRESS) {
+      throw new HttpError(400, "Mandate setup is not in progress");
+    }
+    const updated = await this.directDebitMandateDao.setActive(
+      mandateId,
+      MandateStatus.COMPLETED,
+      transaction
+    );
+    return updated!;
+  }
+
   // ─── Individual (non-group) direct-debit methods ────────────────────────────
 
   /** Get current user's individual direct-debit mandate (no groupId). Returns null if none. */
@@ -575,7 +607,10 @@ export class DirectDebitMandateService {
     let mandate = await this.directDebitMandateDao.findByUserOnly(userId);
     if (!mandate) {
       mandate = await this.directDebitMandateDao.create({ userId, groupId: null }, transaction);
-    } else if (mandate.status === MandateStatus.ACTIVE) {
+    } else if (
+      mandate.status === MandateStatus.ACTIVE ||
+      mandate.status === MandateStatus.APPROVED
+    ) {
       if (this.isWithinYear(mandate.createdAt)) {
         throw new HttpError(400, "You already have an active individual direct debit mandate");
       }
