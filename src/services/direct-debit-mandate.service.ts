@@ -90,7 +90,7 @@ export class DirectDebitMandateService {
     if (!memberMandate) return [];
 
     const rows = await this.accountDao.findByMemberMandateIdOrderByCreatedDesc(memberMandate.id);
-    return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a));
+    return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a, ddm.id));
   }
 
   /** Get current user's direct debit mandate for a group. Returns null if none. */
@@ -397,6 +397,8 @@ export class DirectDebitMandateService {
     groupId: string,
     accountId: string
   ): Promise<{ message: string; account: Record<string, unknown> }> {
+    const ddm = await this.directDebitMandateDao.findByUserAndGroup(userId, groupId);
+
     const membership = await this.groupMemberDao.findByGroupAndUser(groupId, userId);
     if (!membership || membership.status !== GroupMemberStatus.ACTIVE) {
       throw new HttpError(403, "Not an active member of this group");
@@ -421,7 +423,7 @@ export class DirectDebitMandateService {
     if (account.status === AccountStatus.ACTIVE || referenceFresh) {
       return {
         message: "Record",
-        account: DirectDebitMandateService.serializeDebitAccount(account)
+        account: DirectDebitMandateService.serializeDebitAccount(account, ddm?.id ?? null)
       };
     }
 
@@ -468,7 +470,7 @@ export class DirectDebitMandateService {
     if (!refreshed) throw new HttpError(500, "Account not found after update");
     return {
       message: "Record fetched",
-      account: DirectDebitMandateService.serializeDebitAccount(refreshed)
+      account: DirectDebitMandateService.serializeDebitAccount(refreshed, ddm?.id ?? null)
     };
   }
 
@@ -517,9 +519,13 @@ export class DirectDebitMandateService {
   }
 
   /** JSON shape for linked debit accounts (confirm + refresh endpoints). */
-  static serializeDebitAccount(account: Account): Record<string, unknown> {
+  static serializeDebitAccount(
+    account: Account,
+    directDebitMandateId: string | null = null
+  ): Record<string, unknown> {
     return {
       id: account.id,
+      directDebitMandateId,
       mandateId: account.mandateId,
       memberMandateId: account.memberMandateId,
       reference: account.reference,
@@ -593,7 +599,7 @@ export class DirectDebitMandateService {
     if (!userMandate) return [];
 
     const rows = await this.accountDao.findByUserMandateIdOrderByCreatedDesc(userMandate.id);
-    return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a));
+    return rows.map((a) => DirectDebitMandateService.serializeDebitAccount(a, ddm.id));
   }
 
   /**
@@ -777,6 +783,7 @@ export class DirectDebitMandateService {
     userId: string,
     accountId: string
   ): Promise<{ message: string; account: Record<string, unknown> }> {
+    const ddm = await this.directDebitMandateDao.findByUserOnly(userId);
     const account = await this.accountDao.findByIdWithUserMandate(accountId);
     if (!account) throw new HttpError(404, "Record not found");
 
@@ -788,7 +795,10 @@ export class DirectDebitMandateService {
     const maxAgeMs = ACCOUNT_MANDATE_REFRESH_HOURS * 60 * 60 * 1000;
     const referenceFresh = !!account.reference && Date.now() - new Date(account.createdAt).getTime() < maxAgeMs;
     if (account.status === AccountStatus.ACTIVE || referenceFresh) {
-      return { message: "Record", account: DirectDebitMandateService.serializeDebitAccount(account) };
+      return {
+        message: "Record",
+        account: DirectDebitMandateService.serializeDebitAccount(account, ddm?.id ?? null)
+      };
     }
 
     if (!account.monoCustomerId || !account.accountNumber || !account.bankCode) {
@@ -826,7 +836,10 @@ export class DirectDebitMandateService {
     });
     const refreshed = await this.accountDao.findById(accountId);
     if (!refreshed) throw new HttpError(500, "Account not found after update");
-    return { message: "Record fetched", account: DirectDebitMandateService.serializeDebitAccount(refreshed) };
+    return {
+      message: "Record fetched",
+      account: DirectDebitMandateService.serializeDebitAccount(refreshed, ddm?.id ?? null)
+    };
   }
 
   /** Poll Mono for individual account mandate approval; marks account ACTIVE when approved. */

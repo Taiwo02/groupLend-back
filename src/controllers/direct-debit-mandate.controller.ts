@@ -73,7 +73,7 @@ export class DirectDebitMandateController {
         status: mandate.status,
         createdAt: mandate.createdAt.toISOString()
       },
-      accounts: accounts.map((a) => DirectDebitMandateService.serializeDebitAccount(a))
+      accounts: accounts.map((a) => DirectDebitMandateService.serializeDebitAccount(a, mandate.id))
     });
   }
 
@@ -167,7 +167,7 @@ export class DirectDebitMandateController {
         status: mandate.status,
         createdAt: mandate.createdAt.toISOString()
       },
-      accounts: accounts.map((a) => DirectDebitMandateService.serializeDebitAccount(a))
+      accounts: accounts.map((a) => DirectDebitMandateService.serializeDebitAccount(a, mandate.id))
     });
   }
 
