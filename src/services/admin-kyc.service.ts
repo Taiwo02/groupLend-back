@@ -4,7 +4,18 @@ import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
 import { KycVerificationDao } from "../dao/kyc-verification.dao.js";
 import { StatementDao } from "../dao/statement.dao.js";
 import { Op } from "sequelize";
-import { DirectDebitMandate, Group, GroupMember, KycVerification, User, UserKycData } from "../models/index.js";
+import {
+  Account,
+  DirectDebitMandate,
+  Group,
+  GroupMember,
+  KycVerification,
+  Mandate,
+  MemberMandate,
+  User,
+  UserKycData,
+  UserMandate
+} from "../models/index.js";
 import { GroupMemberStatus, KycStatus, MandateStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { decryptBvn } from "../utils/encryption.js";
@@ -154,6 +165,15 @@ export type AdminMandateItem = {
     id: string;
     name: string;
   } | null;
+  accounts: Array<{
+    id: string;
+    accountNumber: string | null;
+    bankCode: string | null;
+    status: string;
+    reference: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 };
 
 export type AdminMandateListResult = {
@@ -597,11 +617,15 @@ export class AdminKycService {
       distinct: true
     });
 
-    const items: AdminMandateItem[] = rows.map((row) => {
-      const mandate = row as DirectDebitMandate & {
+    const mandates = rows as Array<
+      DirectDebitMandate & {
         user?: Pick<User, "id" | "fullName" | "email">;
         group?: Pick<Group, "id" | "name"> | null;
-      };
+      }
+    >;
+    const accountsByMandateId = await this.getAccountsByDirectDebitMandate(mandates);
+
+    const items: AdminMandateItem[] = mandates.map((mandate) => {
       return {
         mandateId: mandate.id,
         mandateType: mandate.groupId ? "Group" : "Individual",
@@ -619,10 +643,133 @@ export class AdminKycService {
               id: mandate.group.id,
               name: mandate.group.name
             }
-          : null
+          : null,
+        accounts: accountsByMandateId.get(mandate.id) ?? []
       };
     });
 
     return { count, items };
+  }
+
+  private async getAccountsByDirectDebitMandate(
+    mandates: Array<
+      DirectDebitMandate & {
+        user?: Pick<User, "id" | "fullName" | "email">;
+        group?: Pick<Group, "id" | "name"> | null;
+      }
+    >
+  ): Promise<Map<string, AdminMandateItem["accounts"]>> {
+    const byMandateId = new Map<string, AdminMandateItem["accounts"]>();
+    if (mandates.length === 0) return byMandateId;
+
+    const groupedMandates = mandates.filter((m) => !!m.groupId);
+    const individualMandates = mandates.filter((m) => !m.groupId);
+
+    const groupKeyToMandateIds = new Map<string, string[]>();
+    for (const mandate of groupedMandates) {
+      const key = `${mandate.userId}:${mandate.groupId}`;
+      const existing = groupKeyToMandateIds.get(key);
+      if (existing) existing.push(mandate.id);
+      else groupKeyToMandateIds.set(key, [mandate.id]);
+    }
+
+    const individualUserIdToMandateIds = new Map<string, string[]>();
+    for (const mandate of individualMandates) {
+      const existing = individualUserIdToMandateIds.get(mandate.userId);
+      if (existing) existing.push(mandate.id);
+      else individualUserIdToMandateIds.set(mandate.userId, [mandate.id]);
+    }
+
+    if (groupKeyToMandateIds.size > 0) {
+      const groupUserIds = [...new Set(groupedMandates.map((m) => m.userId))];
+      const groupIds = [...new Set(groupedMandates.map((m) => m.groupId).filter((id): id is string => !!id))];
+      const rows = await Account.findAll({
+        include: [
+          {
+            model: MemberMandate,
+            as: "memberMandate",
+            required: true,
+            attributes: ["id", "userId"],
+            where: { userId: { [Op.in]: groupUserIds } },
+            include: [
+              {
+                model: Mandate,
+                as: "mandate",
+                required: true,
+                attributes: ["id", "groupId"],
+                where: { groupId: { [Op.in]: groupIds } }
+              }
+            ]
+          }
+        ],
+        order: [["createdAt", "DESC"]]
+      });
+
+      for (const row of rows) {
+        const account = row as Account & {
+          memberMandate?: (MemberMandate & { mandate?: Mandate | null }) | null;
+        };
+        const memberMandate = account.memberMandate;
+        const groupId = memberMandate?.mandate?.groupId ?? null;
+        if (!memberMandate?.userId || !groupId) continue;
+
+        const key = `${memberMandate.userId}:${groupId}`;
+        const mandateIds = groupKeyToMandateIds.get(key);
+        if (!mandateIds || mandateIds.length === 0) continue;
+
+        const serialized = this.serializeAdminMandateAccount(account);
+        for (const mandateId of mandateIds) {
+          const existing = byMandateId.get(mandateId);
+          if (existing) existing.push(serialized);
+          else byMandateId.set(mandateId, [serialized]);
+        }
+      }
+    }
+
+    if (individualUserIdToMandateIds.size > 0) {
+      const userIds = [...individualUserIdToMandateIds.keys()];
+      const rows = await Account.findAll({
+        include: [
+          {
+            model: UserMandate,
+            as: "userMandate",
+            required: true,
+            attributes: ["id", "userId"],
+            where: { userId: { [Op.in]: userIds } }
+          }
+        ],
+        order: [["createdAt", "DESC"]]
+      });
+
+      for (const row of rows) {
+        const account = row as Account & { userMandate?: UserMandate | null };
+        const userId = account.userMandate?.userId;
+        if (!userId) continue;
+
+        const mandateIds = individualUserIdToMandateIds.get(userId);
+        if (!mandateIds || mandateIds.length === 0) continue;
+
+        const serialized = this.serializeAdminMandateAccount(account);
+        for (const mandateId of mandateIds) {
+          const existing = byMandateId.get(mandateId);
+          if (existing) existing.push(serialized);
+          else byMandateId.set(mandateId, [serialized]);
+        }
+      }
+    }
+
+    return byMandateId;
+  }
+
+  private serializeAdminMandateAccount(account: Account): AdminMandateItem["accounts"][number] {
+    return {
+      id: account.id,
+      accountNumber: account.accountNumber ?? null,
+      bankCode: account.bankCode ?? null,
+      status: account.status,
+      reference: account.reference ?? null,
+      createdAt: account.createdAt.toISOString(),
+      updatedAt: account.updatedAt.toISOString()
+    };
   }
 }

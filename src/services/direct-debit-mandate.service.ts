@@ -370,7 +370,8 @@ export class DirectDebitMandateService {
             monoCustomerId,
             accountNumber,
             bankCode,
-            status: AccountStatus.ACTIVE,
+            // Keep account mandate inactive until explicit verify endpoint confirms approval.
+            status: AccountStatus.INACTIVE,
             initiateMandateData: data ?? {}
           },
           transaction
@@ -753,7 +754,8 @@ export class DirectDebitMandateService {
             monoCustomerId,
             accountNumber,
             bankCode,
-            status: AccountStatus.ACTIVE,
+            // Keep account mandate inactive until explicit verify endpoint confirms approval.
+            status: AccountStatus.INACTIVE,
             initiateMandateData: data ?? {}
           },
           transaction
