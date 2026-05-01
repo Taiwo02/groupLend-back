@@ -4826,50 +4826,6 @@
       }
     },
     "/loans/group": {
-      "get": {
-        "operationId": "listGroupLoans",
-        "tags": [
-          "Users · Loans"
-        ],
-        "summary": "List my group loans",
-        "description": "Returns all loans belonging to the authenticated user's active group(s). Use optional query param `status` to filter by loan outcome/status. Each item may include nested `group` and `borrower` objects. Newest first.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "description": "Optional comma-separated loan statuses (e.g. APPROVED,ACTIVE).",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "loans": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/GroupLoan"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "operationId": "requestGroupLoan",
         "tags": [
@@ -4950,6 +4906,84 @@
           },
           "404": {
             "description": "Group not found"
+          }
+        }
+      }
+    },
+    "/loans/group/list": {
+      "post": {
+        "operationId": "listGroupLoans",
+        "tags": [
+          "Users · Loans"
+        ],
+        "summary": "List group loans with filters",
+        "description": "Returns loans for the authenticated user's active group(s). Filters are passed in request body: `status` (multiple values), `startDate`, `endDate`, and `myLoan`. When `myLoan` is true, only loans created by the authenticated user are returned.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "REQUESTED",
+                        "PENDING_APPROVAL",
+                        "INSTITUTIONAL_PENDING",
+                        "APPROVED",
+                        "REVIEWING",
+                        "PROCESSING",
+                        "REJECTED",
+                        "DISBURSED",
+                        "ACTIVE",
+                        "REPAID",
+                        "DEFAULTED"
+                      ]
+                    }
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "myLoan": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "loans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GroupLoan"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -6250,6 +6284,14 @@
           {
             "type": "object",
             "properties": {
+              "memberCount": {
+                "type": "integer",
+                "description": "Number of active members in the loan's group."
+              },
+              "approvedMemberCount": {
+                "type": "integer",
+                "description": "Number of group members that already approved this loan."
+              },
               "group": {
                 "type": "object",
                 "nullable": true,

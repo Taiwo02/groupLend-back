@@ -109,6 +109,22 @@ export class GroupMemberDao {
     }).then((rows) => rows.map((r) => r.groupId));
   }
 
+  async countActiveMembersByGroupIds(
+    groupIds: string[],
+    transaction?: Transaction
+  ): Promise<Map<string, number>> {
+    if (groupIds.length === 0) return new Map();
+    const rows = await GroupMember.findAll({
+      where: { groupId: { [Op.in]: groupIds }, status: GroupMemberStatus.ACTIVE },
+      attributes: ["groupId"]
+    });
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      counts.set(row.groupId, (counts.get(row.groupId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   /** Members who have not yet accepted (status INVITED). */
   findInvitedMembersByGroupId(groupId: string, transaction?: Transaction): Promise<GroupMember[]> {
     return GroupMember.findAll({

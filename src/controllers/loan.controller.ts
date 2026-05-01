@@ -6,7 +6,7 @@ import { verifyLoanPin } from "../utils/loan-pin.js";
 import { LoanPurpose, LoanStatus } from "../models/enums.js";
 import {
   approveLoanBodySchema,
-  groupLoanListQuerySchema,
+  groupLoanListBodySchema,
   groupLoanSchema,
   individualLoanSchema,
   loanIdParamSchema
@@ -79,13 +79,16 @@ export class LoanController {
     return c.json({ loans });
   }
 
-  /** GET /loans/group — current user's group loans (as borrower). */
+  /** POST /loans/group/list — current user's group loans with body filters. */
   async listGroupLoans(c: Context): Promise<Response> {
-    const query = parseWithSchema(groupLoanListQuerySchema, { status: c.req.query("status") });
-    const loans = await this.loanService.listMyGroupLoans(
-      c.get("userId"),
-      query.status as LoanStatus[] | undefined
-    );
+    const body = await readJsonBody<Record<string, unknown>>(c).catch(() => ({}));
+    const payload = parseWithSchema(groupLoanListBodySchema, body);
+    const loans = await this.loanService.listMyGroupLoans(c.get("userId"), {
+      statuses: payload.status as LoanStatus[] | undefined,
+      startDate: payload.startDate ? new Date(payload.startDate) : undefined,
+      endDate: payload.endDate ? new Date(payload.endDate) : undefined,
+      myLoan: payload.myLoan ?? false
+    });
     return c.json({ loans });
   }
 

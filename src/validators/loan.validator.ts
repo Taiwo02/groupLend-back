@@ -23,21 +23,18 @@ export const approveLoanBodySchema = z.object({
   loanPin: z.string().length(4, "Loan PIN must be 4 digits").regex(/^\d{4}$/, "Loan PIN must be 4 digits")
 });
 
-export const groupLoanListQuerySchema = z.object({
-  status: z
-    .string()
-    .optional()
-    .transform((value) => {
-      if (!value) return undefined;
-      return value
-        .split(",")
-        .map((v) => v.trim().toUpperCase())
-        .filter(Boolean);
-    })
-    .refine(
-      (values) =>
-        values == null ||
-        values.every((v) => (Object.values(LoanStatus) as string[]).includes(v)),
-      "status must be a comma-separated list of valid loan statuses"
-    )
+export const groupLoanListBodySchema = z.object({
+  status: z.array(z.enum(Object.values(LoanStatus) as [string, ...string[]])).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  myLoan: z.boolean().optional().default(false)
+}).superRefine((data, ctx) => {
+  if (!data.startDate || !data.endDate) return;
+  if (new Date(data.startDate).getTime() > new Date(data.endDate).getTime()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "startDate must be before or equal to endDate",
+      path: ["startDate"]
+    });
+  }
 });

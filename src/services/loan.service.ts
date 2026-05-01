@@ -11,7 +11,7 @@ import { UserMandateDao } from "../dao/user-mandate.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { UserDao } from "../dao/user.dao.js";
 import { UserKycDataDao } from "../dao/user-kyc-data.dao.js";
-import { Loan, Mandate, UserMandate } from "../models/index.js";
+import { Loan, LoanApproval, Mandate, UserMandate } from "../models/index.js";
 import {
   ApprovalDecision,
   CredibilityLevel,
@@ -499,11 +499,57 @@ export class LoanService {
     return this.loanDao.findIndividualByBorrowerId(borrowerId);
   }
 
-  /** Loans where the authenticated user is the borrower and `groupId` is set. */
-  async listMyGroupLoans(userId: string, statuses?: LoanStatus[]): Promise<Loan[]> {
+  /** Group loans for groups the user belongs to, with optional status/date/myLoan filters. */
+  async listMyGroupLoans(
+    userId: string,
+    filters?: {
+      statuses?: LoanStatus[];
+      startDate?: Date;
+      endDate?: Date;
+      myLoan?: boolean;
+    }
+  ): Promise<Loan[]> {
     const groupIds = await this.groupMemberDao.findActiveGroupIdsByUserId(userId);
     if (groupIds.length === 0) return [];
-    return this.loanDao.findByGroupIds(groupIds, statuses);
+    const [loans, activeMemberCountByGroupId] = await Promise.all([
+      this.loanDao.findByGroupIds(
+        groupIds,
+        {
+          statuses: filters?.statuses,
+          dateFrom: filters?.startDate,
+          dateTo: filters?.endDate,
+          borrowerId: filters?.myLoan ? userId : undefined
+        }
+      ),
+      this.groupMemberDao.countActiveMembersByGroupIds(groupIds)
+    ]);
+
+    for (const loan of loans) {
+      const groupId = loan.groupId;
+      const memberCount = groupId ? activeMemberCountByGroupId.get(groupId) ?? 0 : 0;
+      const approvals = (loan as Loan & { approvals?: LoanApproval[] }).approvals ?? [];
+      const approvedMemberCount = approvals.filter(
+        (approval) => approval.decision === ApprovalDecision.APPROVED
+      ).length;
+      const isApprove = approvals.some(
+        (approval) =>
+          approval.approverId === userId && approval.decision === ApprovalDecision.APPROVED
+      );
+      (loan as unknown as { setDataValue: (k: string, v: number) => void }).setDataValue(
+        "memberCount",
+        memberCount
+      );
+      (loan as unknown as { setDataValue: (k: string, v: number) => void }).setDataValue(
+        "approvedMemberCount",
+        approvedMemberCount
+      );
+      (loan as unknown as { setDataValue: (k: string, v: boolean) => void }).setDataValue(
+        "isApprove",
+        isApprove
+      );
+    }
+
+    return loans;
   }
 
   private computeTotalPayable(amount: number, interestRate: number, tenorMonths: number): number {

@@ -71,18 +71,41 @@ export class LoanDao {
   /** Group loans belonging to provided group ids, optionally filtered by status list. */
   findByGroupIds(
     groupIds: string[],
-    statuses?: LoanStatus[],
+    filters?: {
+      statuses?: LoanStatus[];
+      dateFrom?: Date;
+      dateTo?: Date;
+      borrowerId?: string;
+    },
     transaction?: Transaction
   ): Promise<Loan[]> {
+    const where: Record<string, unknown> = {
+      groupId: { [Op.in]: groupIds }
+    };
+    if (filters?.statuses && filters.statuses.length > 0) {
+      where.status = { [Op.in]: filters.statuses };
+    }
+    if (filters?.borrowerId) {
+      where.borrowerId = filters.borrowerId;
+    }
+    if (filters?.dateFrom || filters?.dateTo) {
+      const createdAtRange: { [Op.gte]?: Date; [Op.lte]?: Date } = {};
+      if (filters.dateFrom) createdAtRange[Op.gte] = filters.dateFrom;
+      if (filters.dateTo) {
+        const end = new Date(filters.dateTo);
+        end.setHours(23, 59, 59, 999);
+        createdAtRange[Op.lte] = end;
+      }
+      where.createdAt = createdAtRange;
+    }
+
     return Loan.findAll({
-      where: {
-        groupId: { [Op.in]: groupIds },
-        ...(statuses && statuses.length > 0 ? { status: { [Op.in]: statuses } } : {})
-      },
+      where,
       order: [["createdAt", "DESC"]],
       include: [
         { association: "group", attributes: ["id", "name"] },
-        { association: "borrower", attributes: ["id", "fullName", "email"] }
+        { association: "borrower", attributes: ["id", "fullName", "email"] },
+        { association: "approvals", required: false }
       ],
       transaction
     });

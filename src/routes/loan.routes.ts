@@ -15,7 +15,7 @@ export function createLoanRoutes(
 
   // Individual loan lists + requests
   routes.get("/individual", (c) => loanController.listIndividualLoans(c));
-  routes.get("/group", (c) => loanController.listGroupLoans(c));
+  routes.post("/group/list", (c) => loanController.listGroupLoans(c));
   routes.get("/activity", (c) => loanController.getMyActivity(c));
 
   routes.post("/individual", requireOnboardingComplete, (c) =>
