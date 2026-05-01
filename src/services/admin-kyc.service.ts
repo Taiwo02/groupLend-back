@@ -169,6 +169,7 @@ export type AdminMandateItem = {
     id: string;
     accountNumber: string | null;
     bankCode: string | null;
+    bankName: string | null;
     status: string;
     reference: string | null;
     createdAt: string;
@@ -762,10 +763,22 @@ export class AdminKycService {
   }
 
   private serializeAdminMandateAccount(account: Account): AdminMandateItem["accounts"][number] {
+    const initiateData = (account.initiateMandateData ?? {}) as Record<string, unknown>;
+    const transferDestinations = Array.isArray(initiateData.transfer_destinations)
+      ? initiateData.transfer_destinations
+      : [];
+    const firstTransferDestination = transferDestinations[0] as Record<string, unknown> | undefined;
+    const bankNameFromTransferDestination =
+      typeof firstTransferDestination?.bank_name === "string"
+        ? firstTransferDestination.bank_name
+        : null;
+    const bankNameFromRoot = typeof initiateData.bank === "string" ? initiateData.bank : null;
+
     return {
       id: account.id,
       accountNumber: account.accountNumber ?? null,
       bankCode: account.bankCode ?? null,
+      bankName: bankNameFromRoot ?? bankNameFromTransferDestination,
       status: account.status,
       reference: account.reference ?? null,
       createdAt: account.createdAt.toISOString(),
