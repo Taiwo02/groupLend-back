@@ -89,6 +89,26 @@ export class DirectDebitMandateDao {
     return map;
   }
 
+  /** Latest direct-debit mandate status per group for a single user. */
+  async findLatestStatusesByUserAndGroupIds(
+    userId: string,
+    groupIds: string[],
+    transaction?: Transaction
+  ): Promise<Map<string, MandateStatus>> {
+    if (groupIds.length === 0) return new Map();
+    const mandates = await DirectDebitMandate.findAll({
+      where: { userId, groupId: { [Op.in]: groupIds } },
+      order: [["createdAt", "DESC"]],
+      transaction
+    });
+    const map = new Map<string, MandateStatus>();
+    for (const m of mandates) {
+      if (!m.groupId) continue;
+      if (!map.has(m.groupId)) map.set(m.groupId, m.status);
+    }
+    return map;
+  }
+
   async countActiveByGroup(groupId: string, userIds: string[], transaction?: Transaction): Promise<number> {
     const count = await DirectDebitMandate.count({
       where: { groupId, userId: userIds, status: { [Op.in]: [MandateStatus.ACTIVE, MandateStatus.APPROVED] } },

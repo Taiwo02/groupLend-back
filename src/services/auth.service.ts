@@ -206,6 +206,8 @@ export class AuthService {
 
     const runningGroupIds =
       await this.directDebitMandateDao.findRunningMandateGroupIdsForUser(userId, groupIds);
+    const latestStatusByGroupId =
+      await this.directDebitMandateDao.findLatestStatusesByUserAndGroupIds(userId, groupIds);
     for (const m of memberships) {
       const grp = m.group;
       if (!grp?.id) continue;
@@ -217,6 +219,12 @@ export class AuthService {
       (grp as unknown as { setDataValue: (k: string, v: boolean) => void }).setDataValue(
         "runningMandate",
         runningGroupIds.has(grp.id)
+      );
+      (
+        grp as unknown as { setDataValue: (k: string, v: string | null) => void }
+      ).setDataValue(
+        "directDebitMandateStatus",
+        latestStatusByGroupId.get(grp.id) ?? null
       );
     }
 
