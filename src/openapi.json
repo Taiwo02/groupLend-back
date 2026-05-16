@@ -2644,7 +2644,7 @@
           "Admin · Loan operations"
         ],
         "summary": "Tabbed loan directory (admin)",
-        "description": "`tab`: pending (PENDING_APPROVAL), pending_disbursement (APPROVED/REVIEWING/PROCESSING), active (ACTIVE), repayment_schedule (ACTIVE + installments), declined (REJECTED). Search matches borrower name/email, group name, or loan UUID. `disbursementReadiness` and `canDisburse` apply to pending group loans; `canDisburse` requires borrower loan PIN.",
+        "description": "`tab`: pending (REQUESTED, PENDING_APPROVAL, INSTITUTIONAL_PENDING — not yet fully approved), pending_disbursement (APPROVED/REVIEWING/PROCESSING), active (ACTIVE), repayment_schedule (ACTIVE + installments), declined (REJECTED). Search matches borrower name/email, group name, or loan UUID. `disbursementReadiness` and `canDisburse` apply to pending_disbursement group loans; `canDisburse` requires borrower loan PIN.",
         "security": [
           {
             "bearerAuth": []

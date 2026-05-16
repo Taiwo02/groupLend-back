@@ -5,6 +5,15 @@ import { LoanStatus } from "../models/enums.js";
 
 const DISBURSED_STATUSES = [LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.REPAID, LoanStatus.DEFAULTED];
 
+/** Loans not yet fully approved by all parties (before APPROVED). */
+const PRE_APPROVAL_STATUSES = [
+  LoanStatus.REQUESTED,
+  LoanStatus.PENDING_APPROVAL,
+  LoanStatus.INSTITUTIONAL_PENDING,
+  LoanStatus.REVIEWING,
+  LoanStatus.PROCESSING
+];
+
 export type AdminLoanOperationsTab =
   | "pending_disbursement"
   | "active"
@@ -322,7 +331,7 @@ export class LoanDao {
       case "active":
         return { status: LoanStatus.ACTIVE };
       case "pending":
-        return { status: LoanStatus.PENDING_APPROVAL };
+        return { status: { [Op.in]: PRE_APPROVAL_STATUSES } };
       case "declined":
         return { status: LoanStatus.REJECTED };
       case "repayment_schedule":
