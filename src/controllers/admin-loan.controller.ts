@@ -23,6 +23,7 @@ const loanIdParamSchema = z.object({ id: z.string().uuid() });
 
 const patchStatusSchema = z.object({
   status: z.union([
+    z.literal(LoanStatus.APPROVED),
     z.literal(LoanStatus.REVIEWING),
     z.literal(LoanStatus.PROCESSING),
     z.literal(LoanStatus.DISBURSED)
@@ -58,7 +59,7 @@ export class AdminLoanController {
     return c.json(data);
   }
 
-  /** PATCH /admin/loans/:id/status — body: { status: REVIEWING | PROCESSING | DISBURSED } */
+  /** PATCH /admin/loans/:id/status — body: { status: APPROVED | REVIEWING | PROCESSING | DISBURSED } */
   async patchLoanStatus(c: Context): Promise<Response> {
     const { id } = parseWithSchema(loanIdParamSchema, { id: c.req.param("id") });
     const body = (await c.req.json()) as unknown;

@@ -2917,7 +2917,7 @@
           "Admin · Loan operations"
         ],
         "summary": "Set group loan admin workflow status",
-        "description": "REVIEWING from APPROVED; PROCESSING from APPROVED or REVIEWING; DISBURSED runs disbursement (credit pool, repayment schedule, ACTIVE). Group loans only.",
+        "description": "APPROVED from REQUESTED, PENDING_APPROVAL, or INSTITUTIONAL_PENDING (admin override: resolves pending peer approvals). REVIEWING from APPROVED; PROCESSING from APPROVED or REVIEWING; DISBURSED runs disbursement (credit pool, repayment schedule, ACTIVE). Group loans only.",
         "security": [
           {
             "bearerAuth": []
@@ -2947,6 +2947,7 @@
                   "status": {
                     "type": "string",
                     "enum": [
+                      "APPROVED",
                       "REVIEWING",
                       "PROCESSING",
                       "DISBURSED"

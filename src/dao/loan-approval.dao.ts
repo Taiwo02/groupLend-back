@@ -21,8 +21,17 @@ export class LoanApprovalDao {
   countByLoanAndDecision(
     loanId: string,
     decision: ApprovalDecision,
-    transaction: Transaction
+    transaction?: Transaction
   ): Promise<number> {
     return LoanApproval.count({ where: { loanId, decision }, transaction });
+  }
+
+  /** Admin override: mark every pending peer approval as approved. */
+  approveAllPendingForLoan(loanId: string, transaction: Transaction): Promise<number> {
+    const respondedAt = new Date();
+    return LoanApproval.update(
+      { decision: ApprovalDecision.APPROVED, respondedAt },
+      { where: { loanId, decision: ApprovalDecision.PENDING }, transaction }
+    ).then(([count]) => count);
   }
 }

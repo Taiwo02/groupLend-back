@@ -1,15 +1,25 @@
 import { DbDao } from "../dao/db.dao.js";
 import type { AdminLoanOperationsTab } from "../dao/loan.dao.js";
+import { LoanApprovalDao } from "../dao/loan-approval.dao.js";
 import { LoanDao } from "../dao/loan.dao.js";
 import { RepaymentDao } from "../dao/repayment.dao.js";
 import { UserDao } from "../dao/user.dao.js";
+import { EmailService } from "../email/email.service.js";
 import { Loan, LoanApproval, Repayment } from "../models/index.js";
 import { ApprovalDecision, LoanStatus } from "../models/enums.js";
 import { HttpError } from "../utils/http-error.js";
 import { LoanService } from "./loan.service.js";
+import { NotificationService } from "./notification.service.js";
 import { toNumber } from "../utils/number.js";
 
+const PRE_APPROVAL_STATUSES: LoanStatus[] = [
+  LoanStatus.REQUESTED,
+  LoanStatus.PENDING_APPROVAL,
+  LoanStatus.INSTITUTIONAL_PENDING
+];
+
 const ADMIN_TRANSITION_STATUSES = new Set<LoanStatus>([
+  LoanStatus.APPROVED,
   LoanStatus.REVIEWING,
   LoanStatus.PROCESSING,
   LoanStatus.DISBURSED
@@ -95,7 +105,10 @@ export class AdminLoanService {
     private readonly dbDao: DbDao,
     private readonly loanService: LoanService,
     private readonly userDao: UserDao,
-    private readonly repaymentDao: RepaymentDao
+    private readonly repaymentDao: RepaymentDao,
+    private readonly loanApprovalDao: LoanApprovalDao,
+    private readonly notificationService: NotificationService,
+    private readonly emailService: EmailService
   ) {}
 
   async listLoanRequests(params: {
@@ -140,7 +153,7 @@ export class AdminLoanService {
    */
   async setLoanStatus(loanId: string, status: LoanStatus): Promise<Loan> {
     if (!ADMIN_TRANSITION_STATUSES.has(status)) {
-      throw new HttpError(400, "Status must be REVIEWING, PROCESSING, or DISBURSED", {
+      throw new HttpError(400, "Status must be APPROVED, REVIEWING, PROCESSING, or DISBURSED", {
         allowed: [...ADMIN_TRANSITION_STATUSES]
       });
     }
@@ -150,6 +163,41 @@ export class AdminLoanService {
       if (!loan) throw new HttpError(404, "Loan not found");
       if (!loan.groupId) {
         throw new HttpError(400, "Only group loans support admin review / disbursement workflow");
+      }
+
+      if (status === LoanStatus.APPROVED) {
+        if (!PRE_APPROVAL_STATUSES.includes(loan.status)) {
+          throw new HttpError(
+            400,
+            "Can only move to APPROVED from REQUESTED, PENDING_APPROVAL, or INSTITUTIONAL_PENDING",
+            { currentStatus: loan.status }
+          );
+        }
+        const rejectedCount = await this.loanApprovalDao.countByLoanAndDecision(
+          loanId,
+          ApprovalDecision.REJECTED,
+          transaction
+        );
+        if (rejectedCount > 0) {
+          throw new HttpError(400, "Loan has a rejected approval");
+        }
+        await this.loanApprovalDao.approveAllPendingForLoan(loanId, transaction);
+        await loan.update({ status: LoanStatus.APPROVED }, { transaction });
+        await loan.reload({ transaction });
+        this.notificationService
+          .notifyLoanApproval(loan.borrowerId, Number(loan.amount))
+          .catch(() => {});
+        const borrower = await this.userDao.findById(loan.borrowerId, transaction);
+        if (borrower?.email) {
+          this.emailService
+            .sendLoanApproval(borrower.email, {
+              borrowerName: borrower.fullName,
+              amount: Number(loan.amount),
+              currency: "NGN"
+            })
+            .catch(() => {});
+        }
+        return loan;
       }
 
       if (status === LoanStatus.REVIEWING) {
