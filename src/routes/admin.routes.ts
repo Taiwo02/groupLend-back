@@ -20,7 +20,7 @@ export function createAdminRoutes(
 
   routes.get("/loan-requests", (c) => adminLoanController.listLoanRequests(c));
   routes.get("/loan-operations/summary", (c) => adminLoanController.getLoanOperationsSummary(c));
-  routes.get("/loan-operations/loans", (c) => adminLoanController.listLoanOperations(c));
+  routes.post("/loan-operations/loans", (c) => adminLoanController.listLoanOperations(c));
   routes.get("/loan-operations/export", (c) => adminLoanController.exportLoanOperations(c));
   routes.post("/loans/:id/disburse", (c) => adminLoanController.disburseLoan(c));
   routes.patch("/loans/:id/status", (c) => adminLoanController.patchLoanStatus(c));

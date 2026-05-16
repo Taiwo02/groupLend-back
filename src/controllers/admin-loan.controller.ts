@@ -3,9 +3,9 @@ import { AdminLoanService } from "../services/admin-loan.service.js";
 import { LoanStatus } from "../models/enums.js";
 import {
   adminLoanOperationsExportQuerySchema,
-  adminLoanOperationsListQuerySchema
+  adminLoanOperationsListBodySchema
 } from "../validators/admin-loan-operations.validator.js";
-import { parseWithSchema } from "../utils/request.js";
+import { parseWithSchema, readJsonBody } from "../utils/request.js";
 import { z } from "zod";
 
 const listQuerySchema = z.object({
@@ -74,21 +74,18 @@ export class AdminLoanController {
     return c.json(data);
   }
 
-  /** GET /admin/loan-operations/loans?tab=&q=&limit=&offset= */
+  /** POST /admin/loan-operations/loans — body: status[], limit, offset, startDate, endDate */
   async listLoanOperations(c: Context): Promise<Response> {
-    const q = parseWithSchema(adminLoanOperationsListQuerySchema, {
-      tab: c.req.query("tab"),
-      q: c.req.query("q"),
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset")
-    });
+    const body = await readJsonBody<Record<string, unknown>>(c).catch(() => ({}));
+    const payload = parseWithSchema(adminLoanOperationsListBodySchema, body);
     const data = await this.adminLoanService.listLoanOperations({
-      tab: q.tab,
-      q: q.q,
-      limit: q.limit,
-      offset: q.offset
+      status: payload.status as LoanStatus[] | undefined,
+      startDate: payload.startDate ? new Date(payload.startDate) : undefined,
+      endDate: payload.endDate ? new Date(payload.endDate) : undefined,
+      limit: payload.limit,
+      offset: payload.offset
     });
-    return c.json({ ...data, limit: q.limit ?? 10, offset: q.offset ?? 0 });
+    return c.json(data);
   }
 
   /** GET /admin/loan-operations/export */
@@ -99,7 +96,7 @@ export class AdminLoanController {
       limit: c.req.query("limit")
     });
     const limit = q.limit ?? 5000;
-    const data = await this.adminLoanService.listLoanOperations({
+    const data = await this.adminLoanService.listLoanOperationsByTab({
       tab: q.tab,
       q: q.q,
       limit,

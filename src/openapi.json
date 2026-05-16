@@ -29,7 +29,7 @@
     },
     {
       "name": "Admin · Loan operations",
-      "description": "Admin loan desk: operations dashboard KPIs and tabbed lists (`/admin/loan-operations/...`), loan request queue (`/admin/loan-requests`), workflow status and disburse (`/admin/loans/{id}/status`, `POST /admin/loans/{id}/disburse`)."
+      "description": "Admin loan desk: operations dashboard KPIs, filtered loan list (`POST /admin/loan-operations/loans`), legacy tab export (`GET /admin/loan-operations/export`), loan request queue (`/admin/loan-requests`), workflow status and disburse (`PATCH /admin/loans/{id}/status`, `POST /admin/loans/{id}/disburse`)."
     },
     {
       "name": "Admin · Institutional lenders",
@@ -2639,76 +2639,69 @@
       }
     },
     "/admin/loan-operations/loans": {
-      "get": {
+      "post": {
+        "operationId": "listAdminLoanOperations",
         "tags": [
           "Admin · Loan operations"
         ],
-        "summary": "Tabbed loan directory (admin)",
-        "description": "`tab`: pending (REQUESTED, PENDING_APPROVAL, INSTITUTIONAL_PENDING, REVIEWING — not yet admin-approved), pending_disbursement (APPROVED/PROCESSING), active (ACTIVE), repayment_schedule (ACTIVE + installments), declined (REJECTED). Search matches borrower name/email, group name, or loan UUID. `disbursementReadiness` and `canDisburse` apply to pending_disbursement group loans; `canDisburse` requires borrower loan PIN.",
+        "summary": "List loans for admin operations (filtered)",
+        "description": "Replaces the former `GET` + `tab` query API. Send filters in the JSON body.\n\n**Body fields**\n- `status` — optional array of loan statuses; omit to return all statuses\n- `startDate` / `endDate` — optional ISO datetimes filtering loan `createdAt` (inclusive end of day for `endDate`)\n- `limit` — page size (default 10, max 100)\n- `offset` — pagination offset (default 0)\n\n**UI tab → `status` mapping** (former `tab` query values)\n| Former tab | `status` array |\n|------------|----------------|\n| `pending` | `[\"REQUESTED\",\"PENDING_APPROVAL\",\"REVIEWING\"]` |\n| `pending_disbursement` | `[\"APPROVED\",\"INSTITUTIONAL_PENDING\",\"PROCESSING\"]` |\n| `active` | `[\"ACTIVE\"]` |\n| `declined` | `[\"REJECTED\"]` |\n| `repayment_schedule` | `[\"ACTIVE\"]` (repayment installments included automatically) |\n\n**Response notes**\n- `disbursementReadiness` / `canDisburse` apply when loan status is `APPROVED` or `PROCESSING` and loan is a group loan\n- `repayments` is present only when `status` is exactly `[\"ACTIVE\"]`",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "parameters": [
-          {
-            "name": "tab",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "pending_disbursement",
-                "active",
-                "repayment_schedule",
-                "declined"
-              ]
-            }
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoanOperationsListRequest"
+              },
+              "examples": {
+                "pendingTab": {
+                  "summary": "Pending queue (former tab=pending)",
+                  "value": {
+                    "status": ["REQUESTED", "PENDING_APPROVAL", "REVIEWING"],
+                    "limit": 10,
+                    "offset": 0
+                  }
+                },
+                "pendingDisbursementTab": {
+                  "summary": "Pending disbursement (former tab=pending_disbursement)",
+                  "value": {
+                    "status": ["APPROVED", "INSTITUTIONAL_PENDING", "PROCESSING"],
+                    "limit": 10,
+                    "offset": 0
+                  }
+                },
+                "withDateRange": {
+                  "summary": "Filter by status and createdAt range",
+                  "value": {
+                    "status": ["PENDING_APPROVAL"],
+                    "startDate": "2026-01-01T00:00:00.000Z",
+                    "endDate": "2026-05-16T23:59:59.999Z",
+                    "limit": 20,
+                    "offset": 0
+                  }
+                }
+              }
             }
           }
-        ],
+        },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Paginated loan rows for the admin operations desk",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/AdminLoanOperationsListResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Validation (e.g. missing tab)"
+            "description": "Validation (e.g. invalid status, or startDate after endDate)"
           },
           "401": {
             "description": "Unauthorized"
@@ -2725,6 +2718,7 @@
           "Admin · Loan operations"
         ],
         "summary": "Export tabbed loan directory (JSON)",
+        "description": "Legacy export using `tab` query (same tab values as the former GET list). For new integrations, prefer `POST /admin/loan-operations/loans` with a `status` array in the body.",
         "security": [
           {
             "bearerAuth": []
@@ -2735,6 +2729,7 @@
             "name": "tab",
             "in": "query",
             "required": true,
+            "description": "Legacy tab filter. See POST /admin/loan-operations/loans for equivalent `status` arrays.",
             "schema": {
               "type": "string",
               "enum": [
@@ -5700,6 +5695,147 @@
             "items": { "$ref": "#/components/schemas/AdminKycListItem" },
             "description": "Same item shape as GET /admin/kyc (individual-style rows per member)"
           }
+        }
+      },
+      "AdminLoanOperationsListRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "array",
+            "description": "Filter by one or more loan statuses. Omit to return all statuses.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "REQUESTED",
+                "PENDING_APPROVAL",
+                "INSTITUTIONAL_PENDING",
+                "APPROVED",
+                "REVIEWING",
+                "PROCESSING",
+                "REJECTED",
+                "DISBURSED",
+                "ACTIVE",
+                "REPAID",
+                "DEFAULTED"
+              ]
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10,
+            "description": "Page size (default 10, max 100)"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Pagination offset (default 0)"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive lower bound on loan createdAt"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive upper bound on loan createdAt (end of calendar day)"
+          }
+        }
+      },
+      "AdminLoanOperationsRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "displayId",
+          "displayName",
+          "borrowerName",
+          "borrowerId",
+          "isGroupLoan",
+          "amount",
+          "status",
+          "canDisburse",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "displayId": { "type": "string", "example": "LN-0042-G" },
+          "displayName": { "type": "string", "description": "Group name or borrower name" },
+          "borrowerName": { "type": "string" },
+          "borrowerId": { "type": "string", "format": "uuid" },
+          "isGroupLoan": { "type": "boolean" },
+          "group": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" }
+            }
+          },
+          "amount": { "type": "number" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "PENDING_APPROVAL",
+              "INSTITUTIONAL_PENDING",
+              "APPROVED",
+              "REVIEWING",
+              "PROCESSING",
+              "REJECTED",
+              "DISBURSED",
+              "ACTIVE",
+              "REPAID",
+              "DEFAULTED"
+            ]
+          },
+          "disbursementReadiness": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["FULLY_APPROVED", "AWAITING_PIN"],
+            "description": "Set for APPROVED/PROCESSING group loans; null otherwise"
+          },
+          "dateApproved": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Latest peer approval timestamp when approvals exist"
+          },
+          "canDisburse": {
+            "type": "boolean",
+            "description": "True when group loan is APPROVED/PROCESSING, borrower has loan PIN, and ready for disbursement"
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "repayments": {
+            "type": "array",
+            "description": "Present only when request status filter is exactly [ACTIVE]",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "dueDate": { "type": "string", "format": "date-time" },
+                "amount": { "type": "number" },
+                "status": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "AdminLoanOperationsListResponse": {
+        "type": "object",
+        "required": ["loans", "total", "limit", "offset"],
+        "properties": {
+          "loans": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminLoanOperationsRow" }
+          },
+          "total": { "type": "integer", "description": "Total rows matching filters (ignoring limit/offset)" },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" }
         }
       },
       "AdminMandateListItem": {

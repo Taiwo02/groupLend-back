@@ -267,30 +267,68 @@ export class AdminLoanService {
   }
 
   async listLoanOperations(params: {
+    status?: LoanStatus[];
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ loans: AdminLoanOperationsRow[]; total: number; limit: number; offset: number }> {
+    const limit = Math.min(params.limit ?? 10, 100);
+    const offset = Math.max(0, params.offset ?? 0);
+    const includeRepayments =
+      params.status?.length === 1 && params.status[0] === LoanStatus.ACTIVE;
+    const [rows, total] = await Promise.all([
+      this.loanDao.findForAdminOperations({
+        status: params.status,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        limit,
+        offset,
+        includeRepayments
+      }),
+      this.loanDao.countForAdminOperations({
+        status: params.status,
+        startDate: params.startDate,
+        endDate: params.endDate
+      })
+    ]);
+    return {
+      loans: rows.map((l) => this.serializeOperationsRow(l, includeRepayments)),
+      total,
+      limit,
+      offset
+    };
+  }
+
+  /** Export still uses legacy tab + search query params. */
+  async listLoanOperationsByTab(params: {
     tab: AdminLoanOperationsTab;
     q?: string;
     limit?: number;
     offset?: number;
   }): Promise<{ loans: AdminLoanOperationsRow[]; total: number; tab: AdminLoanOperationsTab }> {
+    const status = this.loanDao.statusesForOperationsTab(params.tab);
+    const includeRepayments = params.tab === "repayment_schedule";
     const limit = Math.min(params.limit ?? 10, 100);
     const offset = Math.max(0, params.offset ?? 0);
     const [rows, total] = await Promise.all([
       this.loanDao.findForAdminOperations({
-        tab: params.tab,
+        status,
         q: params.q,
         limit,
-        offset
+        offset,
+        includeRepayments
       }),
-      this.loanDao.countForAdminOperations({ tab: params.tab, q: params.q })
+      this.loanDao.countForAdminOperations({ status, q: params.q })
     ]);
     return {
-      loans: rows.map((l) => this.serializeOperationsRow(l, params.tab)),
+      loans: rows.map((l) => this.serializeOperationsRow(l, includeRepayments)),
       total,
       tab: params.tab
     };
   }
 
-  private serializeOperationsRow(loan: Loan, tab: AdminLoanOperationsTab): AdminLoanOperationsRow {
+  private serializeOperationsRow(loan: Loan, includeRepayments: boolean): AdminLoanOperationsRow {
     const raw = loan.toJSON() as Record<string, unknown>;
     const borrower = raw.borrower as
       | { id: string; fullName: string; email: string; loanPinHash?: string | null }
@@ -302,7 +340,7 @@ export class AdminLoanService {
 
     const repaymentsRaw = (loan as Loan & { repayments?: Repayment[] }).repayments;
     const repayments =
-      tab === "repayment_schedule" && Array.isArray(repaymentsRaw)
+      includeRepayments && Array.isArray(repaymentsRaw)
         ? repaymentsRaw.map((r) => ({
             id: r.id,
             dueDate: r.dueDate.toISOString(),

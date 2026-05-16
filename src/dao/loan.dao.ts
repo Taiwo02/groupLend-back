@@ -325,37 +325,60 @@ export class LoanDao {
     }));
   }
 
-  private tabWhereForOperations(tab: AdminLoanOperationsTab): WhereOptions<Loan> {
+  statusesForOperationsTab(tab: AdminLoanOperationsTab): LoanStatus[] {
     switch (tab) {
       case "pending_disbursement":
-        return {
-          status: {[Op.in]: PRE_DISBURSEMENT_STATUSES}
-        };
+        return [...PRE_DISBURSEMENT_STATUSES];
       case "active":
-        return { status: LoanStatus.ACTIVE };
-      case "pending":
-        return { status: { [Op.in]: PRE_APPROVAL_STATUSES } };
-      case "declined":
-        return { status: LoanStatus.REJECTED };
       case "repayment_schedule":
-        return { status: LoanStatus.ACTIVE };
+        return [LoanStatus.ACTIVE];
+      case "pending":
+        return [...PRE_APPROVAL_STATUSES];
+      case "declined":
+        return [LoanStatus.REJECTED];
     }
   }
-  
+
+  private buildAdminOperationsWhere(filters: {
+    status?: LoanStatus[];
+    startDate?: Date;
+    endDate?: Date;
+  }): WhereOptions<Loan> {
+    const parts: WhereOptions<Loan>[] = [];
+    if (filters.status?.length) {
+      parts.push({ status: { [Op.in]: filters.status } });
+    }
+    if (filters.startDate || filters.endDate) {
+      const range: { [Op.gte]?: Date; [Op.lte]?: Date } = {};
+      if (filters.startDate) range[Op.gte] = filters.startDate;
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        range[Op.lte] = end;
+      }
+      parts.push({ createdAt: range });
+    }
+    if (parts.length === 0) return {};
+    if (parts.length === 1) return parts[0]!;
+    return { [Op.and]: parts };
+  }
 
   /**
-   * Admin loan operations dashboard: tabbed list with search (borrower, group name, loan id).
+   * Admin loan operations list: filter by status array and createdAt range.
    */
   async findForAdminOperations(
     opts: {
-      tab: AdminLoanOperationsTab;
+      status?: LoanStatus[];
+      startDate?: Date;
+      endDate?: Date;
       q?: string;
       limit: number;
       offset: number;
+      includeRepayments?: boolean;
     },
     transaction?: Transaction
   ): Promise<Loan[]> {
-    const baseWhere = this.tabWhereForOperations(opts.tab);
+    const baseWhere = this.buildAdminOperationsWhere(opts);
     const term = opts.q?.trim();
     let where: WhereOptions<Loan> = baseWhere;
     if (term) {
@@ -366,7 +389,9 @@ export class LoanDao {
         { "$group.name$": { [Op.iLike]: `%${term}%` } }
       ];
       if (uuidLike) orParts.unshift({ id: term });
-      where = { [Op.and]: [baseWhere, { [Op.or]: orParts }] };
+      where = Object.keys(baseWhere).length
+        ? { [Op.and]: [baseWhere, { [Op.or]: orParts }] }
+        : { [Op.or]: orParts };
     }
 
     const include: import("sequelize").Includeable[] = [
@@ -374,7 +399,7 @@ export class LoanDao {
       { association: "group", attributes: ["id", "name"], required: false },
       { association: "approvals", required: false }
     ];
-    if (opts.tab === "repayment_schedule") {
+    if (opts.includeRepayments) {
       include.push({
         association: "repayments",
         required: false,
@@ -396,14 +421,16 @@ export class LoanDao {
   }
 
   async countForAdminOperations(
-    opts: { tab: AdminLoanOperationsTab; q?: string },
+    opts: {
+      status?: LoanStatus[];
+      startDate?: Date;
+      endDate?: Date;
+      q?: string;
+    },
     transaction?: Transaction
   ): Promise<number> {
-    const baseWhere = this.tabWhereForOperations(opts.tab);
+    const baseWhere = this.buildAdminOperationsWhere(opts);
     const term = opts.q?.trim();
-    // When there is no search term, we can count without joins at all.
-    // This avoids Sequelize alias quirks that can show up in generated COUNT(DISTINCT ...)
-    // queries when `include` is present.
     if (!term) {
       return Loan.count({
         where: baseWhere,
@@ -413,25 +440,20 @@ export class LoanDao {
       });
     }
 
-    let where: WhereOptions<Loan> = baseWhere;
-    if (term) {
-      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(term);
-      const orParts: WhereOptions<Loan>[] = [
-        { "$borrower.fullName$": { [Op.iLike]: `%${term}%` } },
-        { "$borrower.email$": { [Op.iLike]: `%${term}%` } },
-        { "$group.name$": { [Op.iLike]: `%${term}%` } }
-      ];
-      if (uuidLike) orParts.unshift({ id: term });
-      where = { [Op.and]: [baseWhere, { [Op.or]: orParts }] };
-    }
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(term);
+    const orParts: WhereOptions<Loan>[] = [
+      { "$borrower.fullName$": { [Op.iLike]: `%${term}%` } },
+      { "$borrower.email$": { [Op.iLike]: `%${term}%` } },
+      { "$group.name$": { [Op.iLike]: `%${term}%` } }
+    ];
+    if (uuidLike) orParts.unshift({ id: term });
+    const where: WhereOptions<Loan> = Object.keys(baseWhere).length
+      ? { [Op.and]: [baseWhere, { [Op.or]: orParts }] }
+      : { [Op.or]: orParts };
 
     return Loan.count({
       where,
       distinct: true,
-      // NOTE: When using `include`, Sequelize can misinterpret model-qualified
-      // column strings (e.g. "Loan.id") and generate an invalid alias like
-      // "Loan->Loan". Using a bare "id" avoids that and correctly counts
-      // distinct loans.
       col: "id",
       include: [
         { association: "borrower", attributes: [], required: true },
