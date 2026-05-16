@@ -9,9 +9,12 @@ const DISBURSED_STATUSES = [LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.
 const PRE_APPROVAL_STATUSES = [
   LoanStatus.REQUESTED,
   LoanStatus.PENDING_APPROVAL,
-  LoanStatus.INSTITUTIONAL_PENDING,
   LoanStatus.REVIEWING,
-  LoanStatus.PROCESSING
+];
+const PRE_DISBURSEMENT_STATUSES = [
+  LoanStatus.INSTITUTIONAL_PENDING,
+  LoanStatus.PROCESSING,
+  LoanStatus.REJECTED,
 ];
 
 export type AdminLoanOperationsTab =
@@ -324,9 +327,7 @@ export class LoanDao {
     switch (tab) {
       case "pending_disbursement":
         return {
-          status: {
-            [Op.in]: [LoanStatus.APPROVED, LoanStatus.REVIEWING, LoanStatus.PROCESSING]
-          }
+          status: {[Op.in]: PRE_DISBURSEMENT_STATUSES}
         };
       case "active":
         return { status: LoanStatus.ACTIVE };
@@ -338,6 +339,7 @@ export class LoanDao {
         return { status: LoanStatus.ACTIVE };
     }
   }
+  
 
   /**
    * Admin loan operations dashboard: tabbed list with search (borrower, group name, loan id).
