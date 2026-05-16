@@ -1,6 +1,7 @@
 import { z } from "../utils/request.js";
 
 export const adminLoanOperationsTabSchema = z.enum([
+  "pending",
   "pending_disbursement",
   "active",
   "repayment_schedule",

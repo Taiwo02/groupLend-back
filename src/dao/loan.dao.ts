@@ -321,7 +321,7 @@ export class LoanDao {
         };
       case "active":
         return { status: LoanStatus.ACTIVE };
-        case "pending":
+      case "pending":
         return { status: LoanStatus.PENDING_APPROVAL };
       case "declined":
         return { status: LoanStatus.REJECTED };
