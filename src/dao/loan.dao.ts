@@ -5,16 +5,18 @@ import { LoanStatus } from "../models/enums.js";
 
 const DISBURSED_STATUSES = [LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.REPAID, LoanStatus.DEFAULTED];
 
-/** Loans not yet fully approved by all parties (before APPROVED). */
+/** Loans not yet admin-approved (before APPROVED). */
 const PRE_APPROVAL_STATUSES = [
   LoanStatus.REQUESTED,
   LoanStatus.PENDING_APPROVAL,
-  LoanStatus.REVIEWING,
+  LoanStatus.REVIEWING
 ];
+
+/** Approved by admin, awaiting disbursement. */
 const PRE_DISBURSEMENT_STATUSES = [
+  LoanStatus.APPROVED, 
   LoanStatus.INSTITUTIONAL_PENDING,
-  LoanStatus.PROCESSING,
-  LoanStatus.REJECTED,
+  LoanStatus.PROCESSING
 ];
 
 export type AdminLoanOperationsTab =

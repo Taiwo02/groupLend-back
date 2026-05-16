@@ -12,12 +12,6 @@ import { LoanService } from "./loan.service.js";
 import { NotificationService } from "./notification.service.js";
 import { toNumber } from "../utils/number.js";
 
-const PRE_APPROVAL_STATUSES: LoanStatus[] = [
-  LoanStatus.REQUESTED,
-  LoanStatus.PENDING_APPROVAL,
-  LoanStatus.INSTITUTIONAL_PENDING
-];
-
 const ADMIN_TRANSITION_STATUSES = new Set<LoanStatus>([
   LoanStatus.APPROVED,
   LoanStatus.REVIEWING,
@@ -43,11 +37,7 @@ export type AdminLoanListItem = {
   approvals?: Array<{ approverId: string; decision: string; respondedAt: string | null }>;
 };
 
-const PENDING_DISBURSEMENT_STATUSES: LoanStatus[] = [
-  LoanStatus.APPROVED,
-  LoanStatus.REVIEWING,
-  LoanStatus.PROCESSING
-];
+const PENDING_DISBURSEMENT_STATUSES: LoanStatus[] = [LoanStatus.APPROVED, LoanStatus.PROCESSING];
 
 export type AdminLoanOperationsSummary = {
   totalActiveLoans: number;
@@ -165,13 +155,25 @@ export class AdminLoanService {
         throw new HttpError(400, "Only group loans support admin review / disbursement workflow");
       }
 
+      if (status === LoanStatus.REVIEWING) {
+        if (loan.status !== LoanStatus.PENDING_APPROVAL) {
+          throw new HttpError(400, "Can only move to REVIEWING from PENDING_APPROVAL", {
+            currentStatus: loan.status
+          });
+        }
+        await loan.update({ status: LoanStatus.REVIEWING }, { transaction });
+        await loan.reload({ transaction });
+        return loan;
+      }
+
       if (status === LoanStatus.APPROVED) {
-        if (!PRE_APPROVAL_STATUSES.includes(loan.status)) {
-          throw new HttpError(
-            400,
-            "Can only move to APPROVED from REQUESTED, PENDING_APPROVAL, or INSTITUTIONAL_PENDING",
-            { currentStatus: loan.status }
-          );
+        if (
+          loan.status !== LoanStatus.PENDING_APPROVAL &&
+          loan.status !== LoanStatus.REVIEWING
+        ) {
+          throw new HttpError(400, "Can only move to APPROVED from PENDING_APPROVAL or REVIEWING", {
+            currentStatus: loan.status
+          });
         }
         const rejectedCount = await this.loanApprovalDao.countByLoanAndDecision(
           loanId,
@@ -181,7 +183,9 @@ export class AdminLoanService {
         if (rejectedCount > 0) {
           throw new HttpError(400, "Loan has a rejected approval");
         }
-        await this.loanApprovalDao.approveAllPendingForLoan(loanId, transaction);
+        if (loan.status === LoanStatus.PENDING_APPROVAL) {
+          await this.loanApprovalDao.approveAllPendingForLoan(loanId, transaction);
+        }
         await loan.update({ status: LoanStatus.APPROVED }, { transaction });
         await loan.reload({ transaction });
         this.notificationService
@@ -200,18 +204,9 @@ export class AdminLoanService {
         return loan;
       }
 
-      if (status === LoanStatus.REVIEWING) {
-        if (loan.status !== LoanStatus.APPROVED) {
-          throw new HttpError(400, "Can only move to REVIEWING from APPROVED", { currentStatus: loan.status });
-        }
-        await loan.update({ status: LoanStatus.REVIEWING }, { transaction });
-        await loan.reload({ transaction });
-        return loan;
-      }
-
       if (status === LoanStatus.PROCESSING) {
-        if (loan.status !== LoanStatus.APPROVED && loan.status !== LoanStatus.REVIEWING) {
-          throw new HttpError(400, "Can only move to PROCESSING from APPROVED or REVIEWING", {
+        if (loan.status !== LoanStatus.APPROVED) {
+          throw new HttpError(400, "Can only move to PROCESSING from APPROVED", {
             currentStatus: loan.status
           });
         }
@@ -221,12 +216,8 @@ export class AdminLoanService {
       }
 
       // DISBURSED — run disburse pipeline
-      if (
-        loan.status !== LoanStatus.APPROVED &&
-        loan.status !== LoanStatus.REVIEWING &&
-        loan.status !== LoanStatus.PROCESSING
-      ) {
-        throw new HttpError(400, "Can only disburse from APPROVED, REVIEWING, or PROCESSING", {
+      if (loan.status !== LoanStatus.APPROVED && loan.status !== LoanStatus.PROCESSING) {
+        throw new HttpError(400, "Can only disburse from APPROVED or PROCESSING", {
           currentStatus: loan.status
         });
       }

@@ -2586,7 +2586,7 @@
           "Admin · Loan operations"
         ],
         "summary": "Loan operations dashboard KPIs (admin)",
-        "description": "Cards: total ACTIVE loans, sum of amounts in APPROVED/REVIEWING/PROCESSING (pending disbursement), repayment rate (PAID / all installments), portfolio value (disbursed lifecycle loans). Change percentages are placeholders (0) until trend data exists.",
+        "description": "Cards: total ACTIVE loans, sum of amounts in APPROVED/PROCESSING (pending disbursement), repayment rate (PAID / all installments), portfolio value (disbursed lifecycle loans). Change percentages are placeholders (0) until trend data exists.",
         "security": [
           {
             "bearerAuth": []
@@ -2644,7 +2644,7 @@
           "Admin · Loan operations"
         ],
         "summary": "Tabbed loan directory (admin)",
-        "description": "`tab`: pending (REQUESTED, PENDING_APPROVAL, INSTITUTIONAL_PENDING — not yet fully approved), pending_disbursement (APPROVED/REVIEWING/PROCESSING), active (ACTIVE), repayment_schedule (ACTIVE + installments), declined (REJECTED). Search matches borrower name/email, group name, or loan UUID. `disbursementReadiness` and `canDisburse` apply to pending_disbursement group loans; `canDisburse` requires borrower loan PIN.",
+        "description": "`tab`: pending (REQUESTED, PENDING_APPROVAL, INSTITUTIONAL_PENDING, REVIEWING — not yet admin-approved), pending_disbursement (APPROVED/PROCESSING), active (ACTIVE), repayment_schedule (ACTIVE + installments), declined (REJECTED). Search matches borrower name/email, group name, or loan UUID. `disbursementReadiness` and `canDisburse` apply to pending_disbursement group loans; `canDisburse` requires borrower loan PIN.",
         "security": [
           {
             "bearerAuth": []
@@ -2917,7 +2917,7 @@
           "Admin · Loan operations"
         ],
         "summary": "Set group loan admin workflow status",
-        "description": "APPROVED from REQUESTED, PENDING_APPROVAL, or INSTITUTIONAL_PENDING (admin override: resolves pending peer approvals). REVIEWING from APPROVED; PROCESSING from APPROVED or REVIEWING; DISBURSED runs disbursement (credit pool, repayment schedule, ACTIVE). Group loans only.",
+        "description": "REVIEWING from PENDING_APPROVAL (start admin review). APPROVED from PENDING_APPROVAL (direct approve; resolves pending peer approvals) or from REVIEWING (after review). PROCESSING from APPROVED; DISBURSED from APPROVED or PROCESSING (credit pool, repayment schedule, ACTIVE). Group loans only.",
         "security": [
           {
             "bearerAuth": []
