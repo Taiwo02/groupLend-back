@@ -9,6 +9,7 @@ export type AdminLoanOperationsTab =
   | "pending_disbursement"
   | "active"
   | "repayment_schedule"
+  | "pending"
   | "declined";
 
 export class LoanDao {
@@ -320,6 +321,8 @@ export class LoanDao {
         };
       case "active":
         return { status: LoanStatus.ACTIVE };
+        case "pending":
+        return { status: LoanStatus.PENDING_APPROVAL };
       case "declined":
         return { status: LoanStatus.REJECTED };
       case "repayment_schedule":
