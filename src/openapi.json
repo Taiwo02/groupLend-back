@@ -6773,7 +6773,7 @@
             "allOf": [{ "$ref": "#/components/schemas/IndividualOnboarding" }]
           },
           "availableCreditPool": { "type": "number", "description": "Admin-approved access cap for the user's primary group (group.maximumAmount, falling back to targetCredit then currentCreditPool when unset). This is also the maximum a member can request via POST /loans/group. 0 for individual users." },
-          "creditPoolUtilizationPercent": { "type": "integer" },
+          "creditPoolUtilizationPercent": { "type": "integer", "description": "Percent of `availableCreditPool` still available right now (clamped 0–100). 100 when no loans are outstanding; decreases as group loans are disbursed and recovers as they are repaid. Computed as round((availableCreditPool − sum(outstanding principal of DISBURSED/ACTIVE/DEFAULTED loans)) / availableCreditPool × 100)." },
           "personalLimit": { "type": "number", "description": "User's individual credit limit (3× monthly income)." },
           "projectedGroupLimit": { "type": "number", "description": "Group target credit (0 for individual users)." },
           "trustBadge": { "type": "string", "description": "Display label for the user's trust level badge." },

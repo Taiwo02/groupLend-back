@@ -5,6 +5,9 @@ import { LoanStatus } from "../models/enums.js";
 
 const DISBURSED_STATUSES = [LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.REPAID, LoanStatus.DEFAULTED];
 
+/** Loans currently outstanding (borrowed and not yet fully repaid). */
+const OUTSTANDING_STATUSES = [LoanStatus.DISBURSED, LoanStatus.ACTIVE, LoanStatus.DEFAULTED];
+
 /** Loans not yet admin-approved (before APPROVED). */
 const PRE_APPROVAL_STATUSES = [
   LoanStatus.REQUESTED,
@@ -145,6 +148,18 @@ export class LoanDao {
   ): Promise<number> {
     const result = await Loan.sum("amount", {
       where: { userMandateId, status: { [Op.in]: DISBURSED_STATUSES } },
+      transaction
+    });
+    return Number(result ?? 0);
+  }
+
+  /** Sum of currently-outstanding principal for a group (DISBURSED/ACTIVE/DEFAULTED). Used for live pool utilization. */
+  async sumOutstandingPrincipalByGroupId(
+    groupId: string,
+    transaction?: Transaction
+  ): Promise<number> {
+    const result = await Loan.sum("amount", {
+      where: { groupId, status: { [Op.in]: OUTSTANDING_STATUSES } },
       transaction
     });
     return Number(result ?? 0);

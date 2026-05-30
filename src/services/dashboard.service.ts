@@ -251,8 +251,18 @@ export class DashboardService {
     const projectedGroupLimit = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
     const deadline = firstGroup ? toIso8601OrNull(firstGroup.quarterlyEndDate) : null;
     const projectedAmount = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
+    // Utilization = % of the admin-approved cap still available right now.
+    // 100% when no loans are outstanding; drops as loans are disbursed; returns to 100% as they are repaid.
+    const groupOutstandingPrincipal = firstGroup
+      ? await this.loanDao.sumOutstandingPrincipalByGroupId(firstGroup.id)
+      : 0;
     const creditPoolUtilizationPercent =
-      projectedGroupLimit > 0 ? Math.round((availableCreditPool / projectedGroupLimit) * 100) : 0;
+      availableCreditPool > 0
+        ? Math.max(
+            0,
+            Math.min(100, Math.round(((availableCreditPool - groupOutstandingPrincipal) / availableCreditPool) * 100))
+          )
+        : 0;
     const credibilityScore = isGroupMember ? await this.getMaxGroupCredibility(userId) : null;
     const creditEligibility = toNumber(user.creditLimit);
     const trustBadge = this.trustLevelToBadge(user.trustLevel);
