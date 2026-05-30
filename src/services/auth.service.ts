@@ -161,18 +161,38 @@ export class AuthService {
     const user = await this.userDao.findByEmail(input.email.toLowerCase());
     if (!user) throw new HttpError(401, "Invalid credentials");
 
-    if (!user.emailVerified) {
-      await this.userDao.markEmailVerified(user.id);
-      throw new HttpError(403, "Please verify your email before signing in. Check your inbox for the verification link.");
-    }
-
     const valid = await compareHash(input.password, user.passwordHash);
     if (!valid) throw new HttpError(401, "Invalid credentials");
+
+    if (!user.emailVerified) {
+      await this.resendVerificationEmail(user);
+      throw new HttpError(
+        403,
+        "Please verify your email before signing in. We've just sent a fresh verification link to your inbox."
+      );
+    }
 
     const token = signJwt({ sub: user.id, email: user.email });
     const onboardingState: OnboardingState =
       user.monthlyIncome == null ? "INCOME_PENDING" : "ONBOARDING_COMPLETE";
     return { token, user, onboardingState };
+  }
+
+  /** Issue a fresh verification token (24h) and re-send the welcome email. */
+  private async resendVerificationEmail(user: User): Promise<void> {
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await this.userDao.setEmailVerificationToken(user.id, token, expiresAt);
+
+    const baseUrl = env.frontendUrl.replace(/\/$/, "") || "#";
+    const verifyUrl = baseUrl !== "#" ? `${baseUrl}/verify-email?token=${token}` : "#";
+    this.emailService
+      .sendWelcome(user.email, {
+        fullName: user.fullName,
+        baseUrl: env.frontendUrl,
+        verifyUrl
+      })
+      .catch(() => {});
   }
 
   getOnboardingState(user: User): OnboardingState {

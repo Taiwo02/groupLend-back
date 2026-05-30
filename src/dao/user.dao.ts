@@ -131,6 +131,20 @@ export class UserDao {
     await User.update({ emailVerified: true }, { where: { id: userId } });
   }
 
+  async setEmailVerificationToken(
+    userId: string,
+    token: string,
+    expiresAt: Date
+  ): Promise<void> {
+    await User.update(
+      {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: expiresAt
+      },
+      { where: { id: userId } }
+    );
+  }
+
   async updateProfile(
     userId: string,
     data: {
