@@ -1,15 +1,20 @@
 import { Context } from "hono";
 import { GroupService } from "../services/group.service.js";
+import { GroupStatsService } from "../services/group-stats.service.js";
 import {
   createGroupSchema,
   groupIdParamSchema,
   inviteMembersSchema,
   pokeInviteParamsSchema
 } from "../validators/group.validator.js";
+import { groupStatsBodySchema } from "../validators/group-stats.validator.js";
 import { parseWithSchema, readJsonBody } from "../utils/request.js";
 
 export class GroupController {
-  constructor(private readonly groupService: GroupService) {}
+  constructor(
+    private readonly groupService: GroupService,
+    private readonly groupStatsService: GroupStatsService
+  ) {}
 
   async createGroup(c: Context): Promise<Response> {
     const body = await readJsonBody<Record<string, unknown>>(c);
@@ -76,5 +81,17 @@ export class GroupController {
     const params = parseWithSchema(groupIdParamSchema, { id: c.req.param("id") });
     const member = await this.groupService.finalExit(params.id, c.get("userId"));
     return c.json(member);
+  }
+
+  /** POST /groups/:id/stats — body: { startDate?, endDate? } (defaults to last 30 days). */
+  async getStats(c: Context): Promise<Response> {
+    const params = parseWithSchema(groupIdParamSchema, { id: c.req.param("id") });
+    const body = await readJsonBody<Record<string, unknown>>(c).catch(() => ({}));
+    const payload = parseWithSchema(groupStatsBodySchema, body);
+    const stats = await this.groupStatsService.getGroupStats(params.id, c.get("userId"), {
+      startDate: payload.startDate,
+      endDate: payload.endDate
+    });
+    return c.json(stats);
   }
 }

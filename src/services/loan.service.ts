@@ -131,11 +131,14 @@ export class LoanService {
       throw new HttpError(403, "This group's credit is frozen by an administrator");
     }
 
-    const groupMaxApply = group.maximumAmount != null ? toNumber(group.maximumAmount) : 0;
-    if (groupMaxApply > 0 && input.amount > groupMaxApply) {
-      throw new HttpError(400, "Amount exceeds the group's maximum loan amount for this six-month access period", {
-        maxAmount: Number(groupMaxApply.toFixed(2))
-      });
+    // Admin-approved access cap: prefer maximumAmount, fall back to targetCredit, then live pool.
+    const groupApprovedCap = this.resolveGroupAccessCap(group);
+    if (groupApprovedCap > 0 && input.amount > groupApprovedCap) {
+      throw new HttpError(
+        400,
+        "Amount exceeds the group's approved maximum (availableCreditPool). Reduce the amount or ask an admin to increase the maximumAmount.",
+        { availableCreditPool: Number(groupApprovedCap.toFixed(2)) }
+      );
     }
 
     const borrowerMembership = await this.groupMemberDao.findByGroupAndUser(
@@ -162,6 +165,8 @@ export class LoanService {
     }
 
     const currentPool = toNumber(group.currentCreditPool);
+    // Institutional escalation: VERIFIED_TRUST_GROUP can request above the live pool
+    // (but never above the admin-approved cap, which is enforced earlier).
     const isInstitutional =
       group.credibilityLevel === CredibilityLevel.VERIFIED_TRUST_GROUP && input.amount > currentPool;
 
@@ -183,7 +188,9 @@ export class LoanService {
       }
 
       if (!isInstitutional && input.amount > currentPool) {
-        throw new HttpError(400, "Amount exceeds group credit pool");
+        throw new HttpError(400, "Amount exceeds the group's available credit pool", {
+          availableCreditPool: Number(currentPool.toFixed(2))
+        });
       }
 
       const mandateEndYmd =
@@ -555,6 +562,24 @@ export class LoanService {
   private computeTotalPayable(amount: number, interestRate: number, tenorMonths: number): number {
     const interest = amount * interestRate * (tenorMonths / 12);
     return amount + interest;
+  }
+
+  /**
+   * The admin-approved per-loan access cap for a group. Mirrors the dashboard
+   * `availableCreditPool` so the user is always shown a number they can actually
+   * borrow against. Falls back to `targetCredit` then `currentCreditPool` when
+   * `maximumAmount` is not set.
+   */
+  private resolveGroupAccessCap(group: {
+    maximumAmount: number | null;
+    targetCredit: number;
+    currentCreditPool: number;
+  }): number {
+    const max = group.maximumAmount != null ? toNumber(group.maximumAmount) : 0;
+    if (max > 0) return max;
+    const target = toNumber(group.targetCredit);
+    if (target > 0) return target;
+    return toNumber(group.currentCreditPool);
   }
 
   private async generateRepaymentSchedule(loan: Loan, transaction: Transaction): Promise<void> {

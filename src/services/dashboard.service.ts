@@ -246,7 +246,8 @@ export class DashboardService {
     const view = allKycComplete ? "full" : "onboarding";
 
     const firstGroup = isGroupMember ? await this.groupDao.findById(groupIds[0]) : null;
-    const availableCreditPool = firstGroup ? toNumber(firstGroup.currentCreditPool) : 0;
+    const groupApprovedCap = firstGroup ? this.resolveGroupAccessCap(firstGroup) : 0;
+    const availableCreditPool = groupApprovedCap;
     const projectedGroupLimit = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
     const deadline = firstGroup ? toIso8601OrNull(firstGroup.quarterlyEndDate) : null;
     const projectedAmount = firstGroup ? toNumber(firstGroup.targetCredit) : 0;
@@ -584,11 +585,25 @@ export class DashboardService {
         result.push({
           groupId: group.id,
           groupName: group.name,
-          currentPool: toNumber(group.currentCreditPool)
+          currentPool: this.resolveGroupAccessCap(group)
         });
       }
     }
     return result;
+  }
+
+  /**
+   * The admin-approved access cap for a group. Drives both the dashboard
+   * `availableCreditPool` and the per-loan max amount on group loan requests.
+   * Falls back to `targetCredit` then `currentCreditPool` when `maximumAmount`
+   * has not been set by the admin yet.
+   */
+  resolveGroupAccessCap(group: { maximumAmount: number | null; targetCredit: number; currentCreditPool: number }): number {
+    const max = group.maximumAmount != null ? toNumber(group.maximumAmount) : 0;
+    if (max > 0) return max;
+    const target = toNumber(group.targetCredit);
+    if (target > 0) return target;
+    return toNumber(group.currentCreditPool);
   }
 
   private async getMaxGroupCredibility(userId: string): Promise<number> {

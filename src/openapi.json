@@ -52,6 +52,10 @@
       "description": "Borrower dashboard (`GET /dashboard`)."
     },
     {
+      "name": "Users · History",
+      "description": "Unified activity timeline across loans, repayments, group activity and milestones (`POST /history`)."
+    },
+    {
       "name": "Users · Groups",
       "description": "Groups, invites, exits, direct-debit mandates (`/groups/...`)."
     },
@@ -82,6 +86,7 @@
         "Users · Auth",
         "Users · KYC",
         "Users · Dashboard",
+        "Users · History",
         "Users · Groups",
         "Users · Loans",
         "Users · Repayments"
@@ -4168,6 +4173,79 @@
         }
       }
     },
+    "/groups/{id}/stats": {
+      "post": {
+        "operationId": "getGroupStats",
+        "tags": [
+          "Users · Groups"
+        ],
+        "summary": "Group stats dashboard (filtered)",
+        "description": "Aggregated stats for the Group Stats page. Available to any **ACTIVE** group member.\n\n**Body fields**\n- `startDate` / `endDate` — optional ISO datetimes; default range is the last 30 days.\n\n**Response shape**\n- `summary` — header KPIs (total disbursed, repayment rate %, default rate %). `totalSaving`, `attendancePercent`, and `dueDays` / `activeDays` are returned as `null` / `0` placeholders because no underlying data model exists yet.\n- `disbursementVsRepaymentOverTime` — daily series of disbursed vs repaid amounts (one bucket per calendar day in the range).\n- `repaymentBehaviour` — counts of `onTime` vs `late` repayments paid in the range (donut chart).\n- `loanCollectionSummary` — loans disbursed during the range, average loan size, current ACTIVE loan count.\n- `loansCollectedByMember` — total amount disbursed per member (loans with `createdAt` in range).\n- `repaymentByMember` — per member: `totalSubscribed` (sum of repayment amounts due in range) vs `totalRepaid` (paid portion of those).\n- `memberParticipation` — list of active members with `participationPercent: null` (placeholder).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupStatsRequest"
+              },
+              "examples": {
+                "default30d": {
+                  "summary": "Default last 30 days",
+                  "value": {}
+                },
+                "explicitRange": {
+                  "summary": "Custom date range",
+                  "value": {
+                    "startDate": "2026-04-01T00:00:00.000Z",
+                    "endDate": "2026-04-30T23:59:59.999Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aggregated group stats for the requested range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupStatsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation (e.g. startDate after endDate)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Caller is not an ACTIVE member of this group"
+          },
+          "404": {
+            "description": "Group not found"
+          }
+        }
+      }
+    },
     "/groups/{id}/exit/final": {
       "post": {
         "tags": [
@@ -4830,7 +4908,7 @@
           "Users · Loans"
         ],
         "summary": "Request group loan",
-        "description": "Create a group loan; all active group members must approve. Each approver must have an active or admin-approved direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
+        "description": "Create a group loan; all active group members must approve. The requested `amount` is capped by the dashboard's `availableCreditPool` — i.e. the admin-approved access cap (`group.maximumAmount`, falling back to `targetCredit`, then `currentCreditPool`). Going above this returns 400 with `{ availableCreditPool }`. The yearly mandate access cap (typically 2× maximumAmount) is enforced separately. For VERIFIED_TRUST_GROUP groups, requests above the live `currentCreditPool` (but still within `availableCreditPool`) are routed to institutional pending; otherwise the live pool also caps the request. Each approver must have an active or admin-approved direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -4897,7 +4975,7 @@
             }
           },
           "400": {
-            "description": "Amount exceeds pool/access, KYC incomplete, tenor extends beyond group mandate end date, or no active members"
+            "description": "Amount exceeds availableCreditPool (admin-approved cap), exceeds yearly mandate access, exceeds live credit pool, KYC incomplete, tenor extends beyond group mandate end date, or no active members"
           },
           "403": {
             "description": "Not active member or onboarding/PIN"
@@ -5506,6 +5584,72 @@
         }
       }
     },
+    "/history": {
+      "post": {
+        "operationId": "getHistory",
+        "tags": [
+          "Users · History"
+        ],
+        "summary": "Get my activity timeline",
+        "description": "Unified activity feed for the authenticated user, merged and sorted newest-first across:\n\n- **Loan requests** — every loan you've ever requested (group or individual)\n- **Approved** — your loans that reached APPROVED, REVIEWING, PROCESSING, DISBURSED, ACTIVE, or REPAID\n- **Repayments** — every paid repayment you've made, plus a separate `loan_repaid` event when a loan reaches REPAID\n- **Group** — other members joining or exiting your active groups (only events after you joined)\n- **Milestones** — group tier upgrades (currently a snapshot of each group's non-STANDARD `credibilityLevel`; will become a true audit log later)\n\n**Body fields**\n- `category` — one of `all`, `loan_requests`, `approved`, `repayments`, `group`, `milestones`. Defaults to `all`.\n- `startDate` / `endDate` — optional ISO datetimes filtering on each item's `at` timestamp.\n- `limit` — page size (default 20, max 100).\n- `offset` — pagination offset (default 0).\n\nEach item has a stable `id` of the form `<type>:<sourceId>` so the frontend can de-duplicate or animate transitions safely.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistoryRequest"
+              },
+              "examples": {
+                "all": {
+                  "summary": "All activity (default)",
+                  "value": { "category": "all", "limit": 20, "offset": 0 }
+                },
+                "repaymentsOnly": {
+                  "summary": "Repayments tab",
+                  "value": { "category": "repayments", "limit": 20, "offset": 0 }
+                },
+                "groupTab": {
+                  "summary": "Group tab",
+                  "value": { "category": "group", "limit": 20, "offset": 0 }
+                },
+                "byDate": {
+                  "summary": "Date-bounded",
+                  "value": {
+                    "category": "all",
+                    "startDate": "2026-01-01T00:00:00.000Z",
+                    "endDate": "2026-05-31T23:59:59.999Z",
+                    "limit": 50
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paginated activity timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation (e.g. invalid category, or startDate after endDate)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/repayments": {
       "post": {
         "tags": [
@@ -6106,6 +6250,283 @@
           }
         }
       },
+      "HistoryRequest": {
+        "type": "object",
+        "description": "Body for POST /history. All fields optional; defaults to category=all, limit=20, offset=0.",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["all", "loan_requests", "approved", "repayments", "group", "milestones"],
+            "default": "all"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "startDate": { "type": "string", "format": "date-time" },
+          "endDate": { "type": "string", "format": "date-time" }
+        }
+      },
+      "HistoryItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "category",
+          "title",
+          "description",
+          "at",
+          "amount",
+          "currency",
+          "loanId",
+          "groupId",
+          "groupName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable composite id (`<type>:<sourceId>`) suitable as a React key"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "loan_requested",
+              "loan_approved",
+              "loan_disbursed",
+              "loan_repaid",
+              "repayment_received",
+              "member_joined",
+              "member_exited",
+              "tier_upgrade"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": ["loan_requests", "approved", "repayments", "group", "milestones"]
+          },
+          "title": { "type": "string", "description": "Short headline (e.g. \"Repayment received\")" },
+          "description": {
+            "type": "string",
+            "description": "User-facing sentence (e.g. \"You repaid \u20A6825.00 for your active loan.\")"
+          },
+          "at": { "type": "string", "format": "date-time" },
+          "amount": { "type": "number", "nullable": true },
+          "currency": { "type": "string", "nullable": true, "example": "NGN" },
+          "loanId": { "type": "string", "format": "uuid", "nullable": true },
+          "groupId": { "type": "string", "format": "uuid", "nullable": true },
+          "groupName": { "type": "string", "nullable": true }
+        }
+      },
+      "HistoryResponse": {
+        "type": "object",
+        "required": ["items", "total", "limit", "offset", "category"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/HistoryItem" }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total items matched by category + date range (across all pages)"
+          },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "category": {
+            "type": "string",
+            "enum": ["all", "loan_requests", "approved", "repayments", "group", "milestones"]
+          }
+        }
+      },
+      "GroupStatsRequest": {
+        "type": "object",
+        "description": "Body for POST /groups/{id}/stats. Both fields optional; defaults to the last 30 days.",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive start of the analytics window"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive end of the analytics window"
+          }
+        }
+      },
+      "GroupStatsTimeseriesPoint": {
+        "type": "object",
+        "required": ["date", "disbursed", "repaid"],
+        "properties": {
+          "date": { "type": "string", "description": "YYYY-MM-DD bucket date" },
+          "disbursed": { "type": "number" },
+          "repaid": { "type": "number" }
+        }
+      },
+      "GroupStatsMemberRow": {
+        "type": "object",
+        "required": ["memberId", "userId", "fullName", "totalCollected"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "fullName": { "type": "string" },
+          "totalCollected": {
+            "type": "number",
+            "description": "Sum of loan amounts disbursed to this member within the range"
+          }
+        }
+      },
+      "GroupStatsRepaymentByMember": {
+        "type": "object",
+        "required": ["memberId", "userId", "fullName", "totalSubscribed", "totalRepaid"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "fullName": { "type": "string" },
+          "totalSubscribed": {
+            "type": "number",
+            "description": "Sum of repayment amounts due in the range for this member's loans"
+          },
+          "totalRepaid": {
+            "type": "number",
+            "description": "Of those subscribed amounts, how much was paid"
+          }
+        }
+      },
+      "GroupStatsMemberParticipation": {
+        "type": "object",
+        "required": ["memberId", "userId", "fullName", "participationPercent"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "fullName": { "type": "string" },
+          "participationPercent": {
+            "type": "number",
+            "nullable": true,
+            "description": "Placeholder until participation/attendance model exists"
+          }
+        }
+      },
+      "GroupStatsResponse": {
+        "type": "object",
+        "required": [
+          "group",
+          "range",
+          "summary",
+          "disbursementVsRepaymentOverTime",
+          "repaymentBehaviour",
+          "loanCollectionSummary",
+          "loansCollectedByMember",
+          "repaymentByMember",
+          "memberParticipation"
+        ],
+        "properties": {
+          "group": {
+            "type": "object",
+            "required": ["id", "name"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" }
+            }
+          },
+          "range": {
+            "type": "object",
+            "required": ["startDate", "endDate", "days"],
+            "properties": {
+              "startDate": { "type": "string", "format": "date-time" },
+              "endDate": { "type": "string", "format": "date-time" },
+              "days": { "type": "integer", "description": "Number of calendar days in the range" }
+            }
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "totalDisbursed",
+              "totalSaving",
+              "repaymentRatePercent",
+              "defaultRatePercent",
+              "attendancePercent",
+              "dueDays",
+              "activeDays"
+            ],
+            "properties": {
+              "totalDisbursed": {
+                "type": "number",
+                "description": "Sum of principal for loans in DISBURSED/ACTIVE/REPAID/DEFAULTED for this group"
+              },
+              "totalSaving": {
+                "type": "number",
+                "nullable": true,
+                "description": "Placeholder; null until savings model is added"
+              },
+              "repaymentRatePercent": {
+                "type": "number",
+                "description": "PAID repayments / total repayments × 100 (one decimal)"
+              },
+              "defaultRatePercent": {
+                "type": "number",
+                "description": "DEFAULTED loans / lifecycle loans × 100 (two decimals)"
+              },
+              "attendancePercent": {
+                "type": "number",
+                "nullable": true,
+                "description": "Placeholder; null until attendance model is added"
+              },
+              "dueDays": { "type": "integer", "description": "Placeholder; 0" },
+              "activeDays": { "type": "integer", "description": "Placeholder; 0" }
+            }
+          },
+          "disbursementVsRepaymentOverTime": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GroupStatsTimeseriesPoint" }
+          },
+          "repaymentBehaviour": {
+            "type": "object",
+            "required": ["onTime", "late", "total"],
+            "properties": {
+              "onTime": {
+                "type": "integer",
+                "description": "Repayments paid on or before due date in the range"
+              },
+              "late": {
+                "type": "integer",
+                "description": "Repayments paid after due date in the range"
+              },
+              "total": { "type": "integer" }
+            }
+          },
+          "loanCollectionSummary": {
+            "type": "object",
+            "required": ["loansDisbursedInPeriod", "averageLoanSize", "activeLoans"],
+            "properties": {
+              "loansDisbursedInPeriod": { "type": "integer" },
+              "averageLoanSize": { "type": "number" },
+              "activeLoans": {
+                "type": "integer",
+                "description": "Current loans with status ACTIVE (range-independent)"
+              }
+            }
+          },
+          "loansCollectedByMember": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GroupStatsMemberRow" }
+          },
+          "repaymentByMember": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GroupStatsRepaymentByMember" }
+          },
+          "memberParticipation": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GroupStatsMemberParticipation" }
+          }
+        }
+      },
       "GroupMember": {
         "type": "object",
         "properties": {
@@ -6351,7 +6772,7 @@
             "description": "Individual user onboarding checklist. Null for group members.",
             "allOf": [{ "$ref": "#/components/schemas/IndividualOnboarding" }]
           },
-          "availableCreditPool": { "type": "number", "description": "Group pool (0 for individual users)." },
+          "availableCreditPool": { "type": "number", "description": "Admin-approved access cap for the user's primary group (group.maximumAmount, falling back to targetCredit then currentCreditPool when unset). This is also the maximum a member can request via POST /loans/group. 0 for individual users." },
           "creditPoolUtilizationPercent": { "type": "integer" },
           "personalLimit": { "type": "number", "description": "User's individual credit limit (3× monthly income)." },
           "projectedGroupLimit": { "type": "number", "description": "Group target credit (0 for individual users)." },

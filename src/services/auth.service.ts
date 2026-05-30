@@ -192,7 +192,10 @@ export class AuthService {
         baseUrl: env.frontendUrl,
         verifyUrl
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.error(error);
+        console.error(`Failed to send verification email to ${user.email}`);
+      });
   }
 
   getOnboardingState(user: User): OnboardingState {

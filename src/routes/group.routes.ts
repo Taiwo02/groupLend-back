@@ -31,6 +31,7 @@ export function createGroupRoutes(
   );
   routes.post("/:id/invites/:inviteId/poke", (c) => groupController.pokeInvite(c));
   routes.post("/:id/invite", (c) => groupController.inviteMembers(c));
+  routes.post("/:id/stats", (c) => groupController.getStats(c));
   routes.get("/:id", (c) => groupController.getGroup(c));
   routes.post("/:id/exit", (c) => groupController.requestExit(c));
   routes.post("/:id/exit/final", (c) => groupController.finalExit(c));

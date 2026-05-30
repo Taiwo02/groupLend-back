@@ -11,6 +11,7 @@ import { AdminGroupsController } from "./controllers/admin-groups.controller.js"
 import { AdminLoanController } from "./controllers/admin-loan.controller.js";
 import { AdminUsersController } from "./controllers/admin-users.controller.js";
 import { GroupController } from "./controllers/group.controller.js";
+import { HistoryController } from "./controllers/history.controller.js";
 import { DirectDebitMandateController } from "./controllers/direct-debit-mandate.controller.js";
 import { LoanController } from "./controllers/loan.controller.js";
 import { RepaymentController } from "./controllers/repayment.controller.js";
@@ -46,6 +47,8 @@ import { AdminGroupsService } from "./services/admin-groups.service.js";
 import { AdminLoanService } from "./services/admin-loan.service.js";
 import { AdminUsersService } from "./services/admin-users.service.js";
 import { GroupService } from "./services/group.service.js";
+import { GroupStatsService } from "./services/group-stats.service.js";
+import { HistoryService } from "./services/history.service.js";
 import { InvitationService } from "./services/invitation.service.js";
 import { NotificationService } from "./services/notification.service.js";
 import { DirectDebitMandateService } from "./services/direct-debit-mandate.service.js";
@@ -127,6 +130,20 @@ function createContainer() {
     notificationService,
     emailService
   );
+  const groupStatsService = new GroupStatsService(
+    groupDao,
+    groupMemberDao,
+    loanDao,
+    repaymentDao,
+    userDao
+  );
+  const historyService = new HistoryService(
+    userDao,
+    loanDao,
+    repaymentDao,
+    groupDao,
+    groupMemberDao
+  );
   const directDebitMandateService = new DirectDebitMandateService(
     directDebitMandateDao,
     groupMemberDao,
@@ -205,7 +222,8 @@ function createContainer() {
   const adminUsersService = new AdminUsersService();
   const adminUsersController = new AdminUsersController(adminUsersService);
   const loanController = new LoanController(loanService, approvalService, userDao);
-  const groupController = new GroupController(groupService);
+  const groupController = new GroupController(groupService, groupStatsService);
+  const historyController = new HistoryController(historyService);
   const directDebitMandateController = new DirectDebitMandateController(directDebitMandateService);
   const repaymentController = new RepaymentController(repaymentService);
 
@@ -238,6 +256,7 @@ function createContainer() {
     adminUsersController,
     loanController,
     groupController,
+    historyController,
     directDebitMandateController,
     repaymentController,
     requireOnboardingComplete,

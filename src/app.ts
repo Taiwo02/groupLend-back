@@ -11,6 +11,7 @@ import { createDashboardRoutes } from "./routes/dashboard.routes.js";
 import { createAdminRoutes } from "./routes/admin.routes.js";
 import { createDocRoutes } from "./routes/doc.routes.js";
 import { createGroupRoutes } from "./routes/group.routes.js";
+import { createHistoryRoutes } from "./routes/history.routes.js";
 import { createLoanRoutes } from "./routes/loan.routes.js";
 import { createRepaymentRoutes } from "./routes/repayment.routes.js";
 import { HttpError } from "./utils/http-error.js";
@@ -53,6 +54,7 @@ export function createApp(): Hono {
     )
   );
   app.route("/groups", createGroupRoutes(container.groupController, container.directDebitMandateController));
+  app.route("/history", createHistoryRoutes(container.historyController));
   app.route(
     "/loans",
     createLoanRoutes(
