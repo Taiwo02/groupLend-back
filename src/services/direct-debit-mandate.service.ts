@@ -292,8 +292,6 @@ export class DirectDebitMandateService {
 
     let monoCustomerId = mandate.monoCustomerId ?? user.monoCustomerId ?? null;
     if (!monoCustomerId) {
-      const contact = (kyc?.contact ?? {}) as Record<string, unknown>;
-      const address = contact.addressLine1 as string | undefined;
       const parts = (user.fullName || "User").trim().split(/\s+/);
       const firstName = parts[0] ?? "User";
       const lastName = parts.slice(1).join(" ") || firstName;
@@ -302,7 +300,7 @@ export class DirectDebitMandateService {
         email: user.email,
         firstName,
         lastName,
-        address: address ?? user.location ?? undefined,
+        address: this.resolveCustomerAddress(user, kyc),
         phone: user.phone ?? undefined
       });
       const custData = customerRes.data as Record<string, unknown> | undefined;
@@ -688,8 +686,6 @@ export class DirectDebitMandateService {
 
     let monoCustomerId = mandate.monoCustomerId ?? user.monoCustomerId ?? null;
     if (!monoCustomerId) {
-      const contact = (kyc?.contact ?? {}) as Record<string, unknown>;
-      const address = contact.addressLine1 as string | undefined;
       const parts = (user.fullName || "User").trim().split(/\s+/);
       const firstName = parts[0] ?? "User";
       const lastName = parts.slice(1).join(" ") || firstName;
@@ -698,7 +694,7 @@ export class DirectDebitMandateService {
         email: user.email,
         firstName,
         lastName,
-        address: address ?? user.location ?? undefined,
+        address: this.resolveCustomerAddress(user, kyc),
         phone: user.phone ?? undefined
       });
       const custData = customerRes.data as Record<string, unknown> | undefined;
@@ -874,6 +870,30 @@ export class DirectDebitMandateService {
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Resolve the address to send to Mono `createMonoCustomer`. Tries, in order:
+   *  1. `user.location` (the user-set value),
+   *  2. `kyc.contact.addressLine1` (KYC step-zero confirmed address),
+   *  3. `kyc.contact.address`     (older `ContactPayload` shape).
+   * Empty/whitespace strings are treated as missing.
+   */
+  private resolveCustomerAddress(
+    user: { location: string | null },
+    kyc: { contact: unknown } | null
+  ): string | undefined {
+    const pick = (v: unknown): string | undefined => {
+      if (typeof v !== "string") return undefined;
+      const t = v.trim();
+      return t.length > 0 ? t : undefined;
+    };
+    const contact = (kyc?.contact ?? {}) as Record<string, unknown>;
+    return (
+      pick(user.location) ??
+      pick(contact.addressLine1) ??
+      pick(contact.address)
+    );
+  }
 
   /** Max direct-debit coverage from group credit: higher of pool and target, else default. */
   private resolveGroupMaxDebitNgn(group: { currentCreditPool: unknown; targetCredit: unknown }): number {
