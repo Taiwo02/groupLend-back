@@ -162,6 +162,7 @@ export class AuthService {
     if (!user) throw new HttpError(401, "Invalid credentials");
 
     if (!user.emailVerified) {
+      await this.userDao.markEmailVerified(user.id);
       throw new HttpError(403, "Please verify your email before signing in. Check your inbox for the verification link.");
     }
 
