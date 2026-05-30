@@ -4908,7 +4908,7 @@
           "Users · Loans"
         ],
         "summary": "Request group loan",
-        "description": "Create a group loan; all active group members must approve. The requested `amount` is capped by the dashboard's `availableCreditPool` — i.e. the admin-approved access cap (`group.maximumAmount`, falling back to `targetCredit`, then `currentCreditPool`). Going above this returns 400 with `{ availableCreditPool }`. The yearly mandate access cap (typically 2× maximumAmount) is enforced separately. For VERIFIED_TRUST_GROUP groups, requests above the live `currentCreditPool` (but still within `availableCreditPool`) are routed to institutional pending; otherwise the live pool also caps the request. Each approver must have an active or admin-approved direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
+        "description": "Create a group loan; all active group members must approve. The requested `amount` is capped by the dashboard's `availableCreditPool` — i.e. the admin-approved access cap (`group.maximumAmount`, falling back to `targetCredit`, then `currentCreditPool`). Going above this returns 400 with `{ availableCreditPool }`. The yearly mandate access cap (typically 2× maximumAmount) is enforced separately. For VERIFIED_TRUST_GROUP groups, requests above the live `currentCreditPool` (but still within `availableCreditPool`) are routed to `INSTITUTIONAL_PENDING` for review by an institutional lender; the borrower is never blocked on the live pool. Each approver must have an active or admin-approved direct debit mandate for the group (within the last 12 months); if not, they must create and authorize a mandate before approving. The loan tenor is validated: the last repayment date (from today + tenorMonths) must fall on or before the current group mandate end date, or the request fails (renew mandate or reduce tenor). Requires onboarding complete and loan PIN in body.",
         "security": [
           {
             "bearerAuth": []
@@ -4975,7 +4975,7 @@
             }
           },
           "400": {
-            "description": "Amount exceeds availableCreditPool (admin-approved cap), exceeds yearly mandate access, exceeds live credit pool, KYC incomplete, tenor extends beyond group mandate end date, or no active members"
+            "description": "Amount exceeds availableCreditPool (admin-approved cap), exceeds yearly mandate access, KYC incomplete, tenor extends beyond group mandate end date, or no active members"
           },
           "403": {
             "description": "Not active member or onboarding/PIN"

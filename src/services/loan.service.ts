@@ -165,8 +165,10 @@ export class LoanService {
     }
 
     const currentPool = toNumber(group.currentCreditPool);
-    // Institutional escalation: VERIFIED_TRUST_GROUP can request above the live pool
-    // (but never above the admin-approved cap, which is enforced earlier).
+    // Institutional routing only: VERIFIED_TRUST_GROUP requests above the live pool
+    // (but ≤ availableCreditPool, already enforced) are flagged INSTITUTIONAL_PENDING.
+    // We do NOT block borrowers on the live pool — the admin-approved availableCreditPool
+    // and the yearly mandate access cap are the authoritative limits.
     const isInstitutional =
       group.credibilityLevel === CredibilityLevel.VERIFIED_TRUST_GROUP && input.amount > currentPool;
 
@@ -184,12 +186,6 @@ export class LoanService {
       if (input.amount > maxAmount) {
         throw new HttpError(400, "Amount exceeds group access amount for this year", {
           maxAmount: Number(maxAmount.toFixed(2))
-        });
-      }
-
-      if (!isInstitutional && input.amount > currentPool) {
-        throw new HttpError(400, "Amount exceeds the group's available credit pool", {
-          availableCreditPool: Number(currentPool.toFixed(2))
         });
       }
 
