@@ -77,8 +77,7 @@ export function createApp(): Hono {
       return c.json({ message: error.message });
     }
 
-    console.error(error);
-    return c.json({ message: "Internal server error" }, 500);
+    return c.json({ message: error.message || "Internal server error" }, 401);
   });
 
   return app;
