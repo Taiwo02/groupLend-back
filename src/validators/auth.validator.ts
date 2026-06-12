@@ -42,13 +42,19 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, "New password must be at least 8 characters")
 });
 
-/** Partial profile update (display/contact/employment). Use POST /auth/income to change monthly income and credit limit. */
+/** Partial profile update (display/contact/employment/profile picture). Use POST /auth/income to change monthly income and credit limit. */
 export const updateProfileSchema = z
   .object({
     fullName: z.string().trim().min(2, "fullName must be at least 2 characters").optional(),
     phone: z.union([z.string().trim().max(25), z.literal("")]).optional(),
     location: z.union([z.string().trim().max(120), z.literal("")]).optional(),
-    employmentStatus: z.union([z.string().trim().max(80), z.literal("")]).optional()
+    employmentStatus: z.union([z.string().trim().max(80), z.literal("")]).optional(),
+    profilePicture: z
+      .union([
+        z.string().trim().url("profilePicture must be a valid URL").max(500, "profilePicture URL is too long"),
+        z.literal("")
+      ])
+      .optional()
   })
   .transform((data) => ({
     ...data,
@@ -59,14 +65,21 @@ export const updateProfileSchema = z
         ? undefined
         : data.employmentStatus === ""
           ? null
-          : data.employmentStatus
+          : data.employmentStatus,
+    profilePicture:
+      data.profilePicture === undefined
+        ? undefined
+        : data.profilePicture === ""
+          ? null
+          : data.profilePicture
   }))
   .refine(
     (data) =>
       data.fullName !== undefined ||
       data.phone !== undefined ||
       data.location !== undefined ||
-      data.employmentStatus !== undefined,
+      data.employmentStatus !== undefined ||
+      data.profilePicture !== undefined,
     { message: "At least one field is required" }
   );
 

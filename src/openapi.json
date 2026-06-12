@@ -295,7 +295,7 @@
           "Users · Auth"
         ],
         "summary": "Update current user profile",
-        "description": "Partial update of `fullName`, `phone`, `location`, and/or `employmentStatus`. Send at least one field. Empty strings clear nullable fields. To change monthly income and individual credit limit, use `POST /auth/income`.",
+        "description": "Partial update of `fullName`, `phone`, `location`, `employmentStatus` and/or `profilePicture` (uploaded image URL). Send at least one field. Empty strings clear nullable fields (`phone`, `location`, `employmentStatus`, `profilePicture`). To change monthly income and individual credit limit, use `POST /auth/income`.",
         "security": [
           {
             "bearerAuth": []
@@ -327,6 +327,12 @@
                     "type": "string",
                     "maxLength": 80,
                     "description": "Use empty string to clear"
+                  },
+                  "profilePicture": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 500,
+                    "description": "URL to the user's profile picture (e.g. CDN/S3 link returned after upload). Use empty string to clear."
                   }
                 }
               }
@@ -6045,6 +6051,12 @@
           "location": {
             "type": "string",
             "nullable": true
+          },
+          "profilePicture": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "URL to the user's profile picture (set via PATCH /auth/profile)."
           },
           "employmentStatus": {
             "type": "string",

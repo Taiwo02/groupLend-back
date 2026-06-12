@@ -41,6 +41,7 @@ export type UpdateProfileInput = {
   phone?: string | null;
   location?: string | null;
   employmentStatus?: string | null;
+  profilePicture?: string | null;
 };
 
 export type VerifyEmailResult =
@@ -202,7 +203,7 @@ export class AuthService {
     return user.monthlyIncome == null ? "INCOME_PENDING" : "ONBOARDING_COMPLETE";
   }
 
-  /** Update display name, phone, location, and/or employment status. Income and credit limit remain via submitIncome. */
+  /** Update display name, phone, location, employment status and/or profile picture URL. Income and credit limit remain via submitIncome. */
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<User> {
     const user = await this.userDao.findById(userId);
     if (!user) throw new HttpError(404, "User not found");
@@ -211,7 +212,8 @@ export class AuthService {
       ...(input.fullName !== undefined ? { fullName: input.fullName.trim() } : {}),
       ...(input.phone !== undefined ? { phone: input.phone } : {}),
       ...(input.location !== undefined ? { location: input.location } : {}),
-      ...(input.employmentStatus !== undefined ? { employmentStatus: input.employmentStatus } : {})
+      ...(input.employmentStatus !== undefined ? { employmentStatus: input.employmentStatus } : {}),
+      ...(input.profilePicture !== undefined ? { profilePicture: input.profilePicture } : {})
     });
 
     return this.getProfile(userId);

@@ -15,6 +15,7 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   declare phone: string | null;
   declare passwordHash: string;
   declare location: string | null;
+  declare profilePicture: string | null;
   declare employmentStatus: string | null;
   declare monthlyIncome: number | null;
   declare creditLimit: number;
@@ -62,6 +63,11 @@ User.init(
     location: {
       type: DataTypes.STRING(120),
       allowNull: true
+    },
+    profilePicture: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: "profile_picture"
     },
     employmentStatus: {
       type: DataTypes.STRING(80),

@@ -153,6 +153,7 @@ export class UserDao {
       monthlyIncome?: number | null;
       employmentStatus?: string | null;
       location?: string | null;
+      profilePicture?: string | null;
     },
     transaction?: Transaction
   ): Promise<User | null> {
